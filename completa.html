@@ -228,6 +228,7 @@ body.light .hm-cell{border-color:rgba(0,0,0,.1)}
 </style>
 <style id="bp-barra-css">
 #bp-barra{display:flex;align-items:center;gap:8px;padding:6px 12px;background:#000;border-bottom:1px solid var(--green3,#1f3d1f);height:38px;box-sizing:border-box;position:relative;z-index:200}
+#bp-barra .bp-marca{color:var(--green,#7ddc3a);font-size:13px;white-space:nowrap}
 #bp-barra a{color:var(--green,#7ddc3a);text-decoration:none;font-size:13px;font-weight:700;white-space:nowrap}
 #bp-barra select{flex:1 1 auto;min-width:0;max-width:420px;background:#141414;color:#fff;border:1px solid #333;border-radius:6px;padding:4px 6px;font-size:13px}
 #bp-barra .bp-est{font-size:10px;color:#8a8a8a;white-space:nowrap;margin-left:auto}
@@ -237,7 +238,7 @@ body.light .hm-cell{border-color:rgba(0,0,0,.1)}
 #bp-carga a,#bp-carga button{color:#000;background:#7ddc3a;border:0;border-radius:8px;padding:10px 16px;font-weight:700;font-size:14px;text-decoration:none;cursor:pointer}
 @media (min-width:821px){.app{height:calc(100vh - 38px)!important}}
 </style><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="BasketPro"><meta name="theme-color" content="#000000"><link rel="apple-touch-icon" href="icon-180.png"><link rel="manifest" href="manifest.webmanifest"></head>
-<body><div id="bp-barra"><a href="liviana.html" title="Posiciones y estadísticas simples">☰ Simple</a><select id="bp-sel" onchange="bpIr(this.value)" aria-label="Liga"></select><span class="bp-est" id="bp-est"></span></div>
+<body><div id="bp-barra"><b class="bp-marca">🏀 BasketPro</b><select id="bp-sel" onchange="bpIr(this.value)" aria-label="Liga"></select><span class="bp-est" id="bp-est"></span></div>
 <div id="bp-carga"><div class="rueda"></div><div id="bp-carga-txt">Cargando datos…</div></div>
 
 
@@ -35339,7 +35340,7 @@ window.bpGuardia = function(){
   function lsSet(k, v){ try { localStorage.setItem(k, v); return true; } catch(e) { return false; } }
   function error(msg){
     var c = $('bp-carga'); if (!c) return;
-    c.innerHTML = '<div style="font-size:40px">📡</div><div style="max-width:320px;line-height:1.4">' + esc(msg) + '</div><button onclick="location.reload()">Reintentar</button><a href="liviana.html">Ver versión simple</a>';
+    c.innerHTML = '<div style="font-size:40px">📡</div><div style="max-width:320px;line-height:1.4">' + esc(msg) + '</div><button onclick="location.reload()">Reintentar</button>';
   }
   async function pedir(ruta, ms){
     var ac = new AbortController(), t = setTimeout(function(){ ac.abort(); }, ms || 8000);
