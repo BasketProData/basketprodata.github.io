@@ -231,14 +231,17 @@ body.light .hm-cell{border-color:rgba(0,0,0,.1)}
 #bp-barra .bp-marca{color:var(--green,#7ddc3a);font-size:13px;white-space:nowrap}
 #bp-barra a{color:var(--green,#7ddc3a);text-decoration:none;font-size:13px;font-weight:700;white-space:nowrap}
 #bp-barra select{flex:1 1 auto;min-width:0;max-width:420px;background:#141414;color:#fff;border:1px solid #333;border-radius:6px;padding:4px 6px;font-size:13px}
-#bp-barra .bp-est{font-size:10px;color:#8a8a8a;white-space:nowrap;margin-left:auto}
+#bp-barra .bp-est{font-size:10px;color:#8a8a8a;white-space:nowrap;margin-left:auto;text-align:right;line-height:1.25}
+#bp-barra #bp-salir{background:#141414;color:#ccc;border:1px solid #333;border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer}
+#bp-carga input{box-sizing:border-box;width:100%}
+@media (max-width:520px){#bp-barra .bp-marca{display:none}}
 #bp-carga{position:fixed;inset:0;z-index:9999;background:#000;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-family:system-ui,sans-serif;text-align:center;padding:24px}
 #bp-carga .rueda{width:34px;height:34px;border:4px solid #333;border-top-color:#7ddc3a;border-radius:50%;animation:bpgiro 1s linear infinite}
 @keyframes bpgiro{to{transform:rotate(360deg)}}
 #bp-carga a,#bp-carga button{color:#000;background:#7ddc3a;border:0;border-radius:8px;padding:10px 16px;font-weight:700;font-size:14px;text-decoration:none;cursor:pointer}
 @media (min-width:821px){.app{height:calc(100vh - 38px)!important}}
 </style><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="BasketPro"><meta name="theme-color" content="#000000"><link rel="apple-touch-icon" href="icon-180.png"><link rel="manifest" href="manifest.webmanifest"></head>
-<body><div id="bp-barra"><b class="bp-marca">🏀 BasketPro</b><select id="bp-sel" onchange="bpIr(this.value)" aria-label="Liga"></select><span class="bp-est" id="bp-est"></span></div>
+<body><div id="bp-barra"><b class="bp-marca">🏀 BasketPro</b><select id="bp-sel" onchange="bpIr(this.value)" aria-label="Liga"></select><span class="bp-est" id="bp-est"></span><button id="bp-salir" onclick="bpSalir()" style="display:none">Salir</button></div>
 <div id="bp-carga"><div class="rueda"></div><div id="bp-carga-txt">Cargando datos…</div></div>
 
 
@@ -35092,19 +35095,8 @@ function doHomeExport(type='pdf') {
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Init directly
-window.bpSembrar = function(d){
-  var k = LS_BASE + '_lg_' + d.registry.activa, viejo = null, id = d.registry.activa;
-  try { viejo = JSON.parse(localStorage.getItem(k) || 'null'); } catch(e) {}
-  var caja = d.caja, bak = null;
-  try { bak = JSON.parse(localStorage.getItem(LS_BASE + '_scout_' + id) || 'null'); } catch(e) {}
-  if (!viejo && bak) viejo = { rivalGames: bak.rivalGames, rivalAccData: bak.rivalAccData, rivalName: bak.rivalName, rivalPositions: bak.rivalPositions, rivalPlayerStatus: bak.rivalPlayerStatus, proximaCondicion: bak.proximaCondicion, playerStatus: bak.playerStatus, plantel: bak.plantel, cfgData: { planes: bak.planes }, leagueGames: bak.propios || [] };
-  if (viejo) {
-    ['rivalGames','rivalAccData','rivalName','rivalPositions','rivalPlayerStatus','proximaCondicion','playerStatus','plantel'].forEach(function(c){ if (viejo[c] !== undefined) caja[c] = viejo[c]; });
-    if (viejo.cfgData && viejo.cfgData.planes) { caja.cfgData = caja.cfgData || {}; caja.cfgData.planes = viejo.cfgData.planes; }
-    var propios = (viejo.leagueGames || []).filter(function(g){ return g && g.scouting; });
-    if (propios.length) caja.leagueGames = (caja.leagueGames || []).concat(propios);
-  }
-  // cajas de otras ligas: se guarda solo su scouting (chico) y se libera el espacio
+window.bpLiberar = function(k){
+  // cajas de ligas: se guarda solo su scouting (chico) y se libera el espacio / los datos del dispositivo
   Object.keys(localStorage).forEach(function(x){
     if (x.indexOf(LS_BASE + '_lg_') !== 0 || x === k) return;
     try {
@@ -35117,6 +35109,20 @@ window.bpSembrar = function(d){
     } catch(e) {}
     localStorage.removeItem(x);
   });
+};
+window.bpSembrar = function(d){
+  var k = LS_BASE + '_lg_' + d.registry.activa, viejo = null, id = d.registry.activa;
+  try { viejo = JSON.parse(localStorage.getItem(k) || 'null'); } catch(e) {}
+  var caja = d.caja, bak = null;
+  try { bak = JSON.parse(localStorage.getItem(LS_BASE + '_scout_' + id) || 'null'); } catch(e) {}
+  if (!viejo && bak) viejo = { rivalGames: bak.rivalGames, rivalAccData: bak.rivalAccData, rivalName: bak.rivalName, rivalPositions: bak.rivalPositions, rivalPlayerStatus: bak.rivalPlayerStatus, proximaCondicion: bak.proximaCondicion, playerStatus: bak.playerStatus, plantel: bak.plantel, cfgData: { planes: bak.planes }, leagueGames: bak.propios || [] };
+  if (viejo) {
+    ['rivalGames','rivalAccData','rivalName','rivalPositions','rivalPlayerStatus','proximaCondicion','playerStatus','plantel'].forEach(function(c){ if (viejo[c] !== undefined) caja[c] = viejo[c]; });
+    if (viejo.cfgData && viejo.cfgData.planes) { caja.cfgData = caja.cfgData || {}; caja.cfgData.planes = viejo.cfgData.planes; }
+    var propios = (viejo.leagueGames || []).filter(function(g){ return g && g.scouting; });
+    if (propios.length) caja.leagueGames = (caja.leagueGames || []).concat(propios);
+  }
+  bpLiberar(k);
   localStorage.removeItem(LS_BASE);
   localStorage.setItem(LEAGUE_REGISTRY_KEY, JSON.stringify(d.registry));
   localStorage.setItem(k, JSON.stringify(caja));
@@ -35338,14 +35344,30 @@ window.bpGuardia = function(){
   function esc(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   function lsGet(k){ try { return localStorage.getItem(k); } catch(e) { return null; } }
   function lsSet(k, v){ try { localStorage.setItem(k, v); return true; } catch(e) { return false; } }
-  function error(msg){
-    var c = $('bp-carga'); if (!c) return;
-    c.innerHTML = '<div style="font-size:40px">📡</div><div style="max-width:320px;line-height:1.4">' + esc(msg) + '</div><button onclick="location.reload()">Reintentar</button>';
+  function lsDel(k){ try { localStorage.removeItem(k); } catch(e) {} }
+  function pantalla(html){ var c = $('bp-carga'); if (c) c.innerHTML = html; }
+  function error(msg, extra){
+    pantalla('<div style="font-size:40px">📡</div><div style="max-width:320px;line-height:1.4">' + esc(msg) + '</div><button onclick="location.reload()">Reintentar</button>' + (extra || ''));
   }
-  async function pedir(ruta, ms){
+  // ── sesión (usuario y contraseña) ──
+  function sesion(){ try { return JSON.parse(lsGet('bpc_sesion') || 'null'); } catch(e) { return null; } }
+  function guardarSesion(r){ lsSet('bpc_sesion', JSON.stringify({ a: r.access_token, r: r.refresh_token, e: (r.user && r.user.email) || '', x: Date.now() + (r.expires_in || 3600) * 1000 })); }
+  async function refrescar(){
+    var s = sesion(); if (!s || !s.r) return false;
+    try {
+      var r = await fetch(SB + '/auth/v1/token?grant_type=refresh_token', { method: 'POST', headers: { apikey: KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: s.r }) });
+      if (r.status === 400 || r.status === 401) { lsDel('bpc_sesion'); return false; }   // la sesión ya no vale
+      if (!r.ok) return true;                                                           // problema de red/servidor: se conserva
+      var j = await r.json(); guardarSesion(j); return true;
+    } catch(e) { return true; }
+  }
+  async function pedir(ruta, ms, reintento){
+    var s = sesion();
+    if (s && s.x && s.x < Date.now() + 60000) { await refrescar(); s = sesion(); }
     var ac = new AbortController(), t = setTimeout(function(){ ac.abort(); }, ms || 8000);
     try {
-      var r = await fetch(SB + '/rest/v1/' + ruta, { headers: { apikey: KEY, Authorization: 'Bearer ' + KEY }, signal: ac.signal });
+      var r = await fetch(SB + '/rest/v1/' + ruta, { headers: { apikey: KEY, Authorization: 'Bearer ' + (s ? s.a : KEY) }, signal: ac.signal });
+      if (r.status === 401 && s && !reintento) { clearTimeout(t); if (await refrescar() && sesion()) return pedir(ruta, ms, true); }
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return await r.json();
     } finally { clearTimeout(t); }
@@ -35367,14 +35389,66 @@ window.bpGuardia = function(){
     s.innerHTML = html;
   }
   window.bpIr = function(id){ if (id && id !== ID) location.href = 'completa.html?liga=' + encodeURIComponent(id); };
+  window.bpSalir = function(){
+    try { if (typeof saveToStorage === 'function') saveToStorage(); } catch(e) {}
+    window.saveToStorage = function(){};                       // nada vuelve a escribir los datos mientras se cierra la sesión
+    try { bpLiberar(null); } catch(e) {}                       // los datos de las ligas se borran de este dispositivo
+    Object.keys(localStorage).forEach(function(k){ if (k.indexOf('bpc_caja_') === 0 || k === 'bpc_sesion' || k === 'bpc_ligas' || k === 'bpc_ultima') lsDel(k); });
+    location.href = 'completa.html';
+  };
   function fecha(iso){ try { var d = new Date(iso); return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }) + ' ' + d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }); } catch(e) { return ''; } }
+  function fechaCorta(ymd){ var m = /^(\d{4})-(\d\d)-(\d\d)/.exec(ymd || ''); return m ? m[3] + '/' + m[2] + '/' + m[1] : ''; }
+
+  // ── pantalla de ingreso ──
+  function login(msg, contacto){
+    try { bpLiberar(null); } catch(e) {}                       // sin sesión no quedan datos de ligas en el dispositivo
+    pantalla('<div style="font-size:34px">🏀</div><div style="font-size:20px;font-weight:800">BasketPro</div>' +
+      '<div style="color:#aaa;font-size:14px;max-width:300px">Ingresá con tu usuario para ver las estadísticas.</div>' +
+      '<form id="bp-form" style="display:flex;flex-direction:column;gap:10px;width:100%;max-width:300px">' +
+      '<input id="bp-em" type="email" autocomplete="username" placeholder="Email" required style="padding:11px;border-radius:8px;border:1px solid #333;background:#141414;color:#fff;font-size:16px">' +
+      '<input id="bp-pw" type="password" autocomplete="current-password" placeholder="Contraseña" required style="padding:11px;border-radius:8px;border:1px solid #333;background:#141414;color:#fff;font-size:16px">' +
+      '<button type="submit" id="bp-ing">Ingresar</button></form>' +
+      '<div id="bp-lmsg" style="color:#ff7a7a;font-size:13px;max-width:300px;min-height:18px">' + esc(msg || '') + '</div>' +
+      (contacto ? '<div style="color:#aaa;font-size:13px;max-width:300px">' + esc(contacto) + '</div>' : ''));
+    $('bp-form').onsubmit = async function(ev){
+      ev.preventDefault();
+      var b = $('bp-ing'), m = $('bp-lmsg'); b.disabled = true; b.textContent = 'Ingresando…'; m.textContent = '';
+      try {
+        var r = await fetch(SB + '/auth/v1/token?grant_type=password', { method: 'POST', headers: { apikey: KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: $('bp-em').value.trim().toLowerCase(), password: $('bp-pw').value }) });
+        if (r.status === 400 || r.status === 401) { m.textContent = 'Email o contraseña incorrectos.'; }
+        else if (!r.ok) { m.textContent = 'No se pudo ingresar. Probá de nuevo en un rato.'; }
+        else { guardarSesion(await r.json()); pantalla('<div class="rueda"></div><div>Cargando datos…</div>'); return main(); }
+      } catch(e) { m.textContent = 'Sin conexión. Revisá tu internet e intentá de nuevo.'; }
+      b.disabled = false; b.textContent = 'Ingresar';
+    };
+  }
+  function sinAcceso(contacto){
+    try { bpLiberar(null); } catch(e) {}
+    var s = sesion();
+    pantalla('<div style="font-size:40px">🔒</div><div style="max-width:320px;line-height:1.4"><b>Tu suscripción no está activa</b><br>' + (s && s.e ? esc(s.e) + '<br>' : '') + 'Puede haber vencido o todavía no estar habilitada.</div>' +
+      (contacto ? '<div style="color:#aaa;font-size:13px;max-width:300px">' + esc(contacto) + '</div>' : '') + '<button onclick="bpSalir()">Cerrar sesión</button>');
+  }
+
   async function main(){
-    var ligas = null, fila = null, offline = false;
-    try { ligas = await pedir('ligas?select=id,nombre,grupo,orden&order=nombre.asc'); lsSet('bpc_ligas', JSON.stringify(ligas)); }
-    catch(e) {
-      try { ligas = await pedir('ligas?select=id,nombre&order=nombre.asc'); lsSet('bpc_ligas', JSON.stringify(ligas)); }
-      catch(e2) { offline = true; try { ligas = JSON.parse(lsGet('bpc_ligas') || 'null'); } catch(e3) {} }
+    var ligas = null, fila = null, offline = false, modo = lsGet('bpc_modo') || 'abierto', contacto = lsGet('bpc_contacto') || '';
+    try {
+      var aj = await pedir('ajustes?select=clave,valor');
+      aj.forEach(function(x){ if (x.clave === 'modo') modo = x.valor; if (x.clave === 'contacto') contacto = x.valor || ''; });
+      lsSet('bpc_modo', modo); lsSet('bpc_contacto', contacto);
+    } catch(e) { offline = true; }
+    var ses = sesion();
+    if (!offline && modo === 'suscripcion' && !ses) return login('', contacto);
+    if (!offline) {
+      try { ligas = await pedir('ligas?select=id,nombre,grupo,orden&order=nombre.asc'); lsSet('bpc_ligas', JSON.stringify(ligas)); }
+      catch(e) {
+        if (!sesion() && ses) return login('Tu sesión se cerró. Ingresá de nuevo.', contacto);
+        try { ligas = await pedir('ligas?select=id,nombre&order=nombre.asc'); lsSet('bpc_ligas', JSON.stringify(ligas)); }
+        catch(e2) { offline = true; }
+      }
     }
+    if (offline) { try { ligas = JSON.parse(lsGet('bpc_ligas') || 'null'); } catch(e3) {} if (modo === 'suscripcion' && !ses) return error('Sin conexión. Para ingresar necesitás internet.'); }
+    ses = sesion();
+    if (!offline && modo === 'suscripcion' && (!ligas || !ligas.length)) { Object.keys(localStorage).forEach(function(k){ if (k.indexOf('bpc_caja_') === 0) lsDel(k); }); return sinAcceso(contacto); }
     if (ligas) selector(ligas);
     if (!ID) { if (ligas && ligas.length) { var ult = lsGet('bpc_ultima'), dest = ordenar(ligas)[0].id; ligas.forEach(function(l){ if (l.id === ult) dest = ult; }); location.replace('completa.html?liga=' + encodeURIComponent(dest)); return; } return error('No se pudo cargar la lista de ligas. Revisá tu conexión.'); }
     if (!offline) {
@@ -35384,13 +35458,14 @@ window.bpGuardia = function(){
     var comp = null, act = null;
     if (fila && fila.datos) {
       comp = fila.datos; act = fila.actualizado;
-      // cache de la última liga vista (para abrir sin conexión)
-      try { Object.keys(localStorage).forEach(function(x){ if (x.indexOf('bpc_caja_') === 0) localStorage.removeItem(x); }); } catch(e) {}
+      try { Object.keys(localStorage).forEach(function(x){ if (x.indexOf('bpc_caja_') === 0) lsDel(x); }); } catch(e) {}
       lsSet('bpc_caja_' + ID, JSON.stringify({ d: comp, a: act }));
     } else if (offline) {
       try { var c = JSON.parse(lsGet('bpc_caja_' + ID) || 'null'); if (c) { comp = c.d; act = c.a; } } catch(e) {}
     } else {
-      return error('Esta liga todavía no tiene el análisis completo publicado.');
+      lsDel('bpc_caja_' + ID);
+      return error(modo === 'suscripcion' ? 'Esta liga no está disponible (todavía no se publicó o no está incluida en tu suscripción).' : 'Esta liga todavía no tiene el análisis completo publicado.',
+        ligas && ligas.length ? '<a href="completa.html">Ver otra liga</a>' : '');
     }
     if (!comp) return error(offline ? 'Sin conexión y esta liga todavía no se descargó en este dispositivo.' : 'No se encontró esta liga.');
     var caja;
@@ -35403,8 +35478,13 @@ window.bpGuardia = function(){
     } catch(e) { console.error(e); return error('No se pudo abrir la liga en este dispositivo.'); }
     document.title = 'BasketPro · ' + nombre;
     lsSet('bpc_ultima', ID);
-    $('bp-est').textContent = (offline ? 'Sin conexión · ' : 'Actualizado ') + (act ? fecha(act) : '');
-    $('bp-carga').remove();
+    var linea2 = '';
+    if (ses && !offline) {
+      try { var sb = await pedir('suscriptores?select=vence&email=eq.' + encodeURIComponent(ses.e || ''), 5000); if (sb && sb[0]) linea2 = 'Suscripción hasta ' + fechaCorta(sb[0].vence); } catch(e) {}
+    }
+    $('bp-est').innerHTML = esc((offline ? 'Sin conexión · ' : 'Actualizado ') + (act ? fecha(act) : '')) + (linea2 ? '<br>' + esc(linea2) : '');
+    if (ses) { var sl = $('bp-salir'); sl.style.display = ''; sl.title = ses.e || ''; }
+    var cg = $('bp-carga'); if (cg) cg.remove();
   }
   main();
 })();
