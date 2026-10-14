@@ -21846,7 +21846,7 @@ async function generarInformeFijo() {
       ${cfgData.asocLogo ? `<img src="${cfgData.asocLogo}" style="height:56px;object-fit:contain;margin-bottom:26px">` : ''}
       <div style="font-size:10pt;letter-spacing:4px;text-transform:uppercase;color:#999">Informe de partido</div>
       ${filaMarcas}
-      <div style="font-size:${hayMarcas?'30pt':'34pt'};font-weight:900;color:${G};letter-spacing:-1px;line-height:1.15">${team}</div>
+      <div data-sin-escudo="1" style="font-size:${hayMarcas?'30pt':'34pt'};font-weight:900;color:${G};letter-spacing:-1px;line-height:1.15">${team}</div>
       ${rivalName ? `<div style="font-size:${hayMarcas?'16pt':'19pt'};color:#555;margin-top:6px">vs ${rivalName}</div>` : ''}
       <div style="height:3px;width:70px;background:${G};margin:20px auto"></div>
       <div style="font-size:12pt;letter-spacing:2px;color:#666;text-transform:uppercase">${_ctxTorneo()}</div>
@@ -35195,8 +35195,7 @@ window.bpIniciar = function(){
   </div>
 </div>
 
-<div id="build-stamp" title="Versión del archivo que estás abriendo" style="position:fixed;left:10px;bottom:6px;z-index:50;font-size:10px;color:#8a8a8a;background:rgba(0,0,0,.35);padding:2px 8px;border-radius:10px;pointer-events:none">Versión 08/10/2026 16:00 · Excel con OT + origen del box deducido</div>
-<style id="bp-publico-css">
+<div id="build-stamp" title="Versión del archivo que estás abriendo" style="position:fixed;left:10px;bottom:6px;z-index:50;font-size:10px;color:#8a8a8a;background:rgba(0,0,0,.35);padding:2px 8px;border-radius:10px;pointer-events:none">Versión 08/10/2026 16:00 · Excel con OT + origen del<style id="bp-publico-css">
 #nav-cfg,#nav-hist,#nav-alert,#build-stamp{display:none!important}
 .bp-oculto{display:none!important}
 /* ── Adaptación a celular: menú inferior, contenido a ancho completo ── */
@@ -35336,6 +35335,22 @@ window.bpGuardia = function(){
 };
 </script>
 <script id="bp-cargador">
+  // "Mostrar contraseña" debajo de cada campo de clave (aparece solo, también en pantallas que se dibujan después)
+  function ojoClaves() {
+    var l = document.querySelectorAll('input[type="password"]:not([data-ojo])');
+    for (var i = 0; i < l.length; i++) {
+      (function (inp) {
+        inp.setAttribute('data-ojo', '1');
+        var lab = document.createElement('label');
+        lab.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:12px;opacity:.8;margin:4px 0 0;cursor:pointer;text-align:left;font-weight:500;color:inherit';
+        var cb = document.createElement('input'); cb.type = 'checkbox'; cb.style.cssText = 'width:auto;margin:0';
+        cb.onchange = function () { inp.type = cb.checked ? 'text' : 'password'; };
+        lab.appendChild(cb); lab.appendChild(document.createTextNode(' Mostrar contraseña'));
+        inp.insertAdjacentElement('afterend', lab);
+      })(l[i]);
+    }
+  }
+  try { new MutationObserver(ojoClaves).observe(document.documentElement, { childList: true, subtree: true }); ojoClaves(); } catch (e) {}
 (function(){
   var SB = "https://zzsdehjsqhgrekgyxltn.supabase.co", KEY = "sb_publishable_i99oHPHOCo07B44DrzSBiA_WQN28wDI";
   var P = new URLSearchParams(location.search), ID = (P.get('liga') || '').trim();
@@ -35517,5 +35532,197 @@ window.bpGuardia = function(){
   main();
 })();
 </script>
+<script id="bp-escudos">
+/* BasketPro · Escudos de los equipos en pantallas e informes.
+   Busca nombres de equipo que aparecen solos (una celda, un título, una fila) y les pone delante el escudo cargado
+   en Configuración → Equipos. También lo hace en los informes que se exportan (vista previa, PDF y ventanas de impresión).
+   No toca nada si el equipo no tiene escudo. */
+(function () {
+  'use strict';
+  var NO = { SCRIPT: 1, STYLE: 1, SELECT: 1, OPTION: 1, TEXTAREA: 1, INPUT: 1, NOSCRIPT: 1, TITLE: 1, CANVAS: 1, SVG: 1, TEXT: 1 };
+  var cacheMapa = null, cacheFirma = '', cacheFuzzy = {};
+  function norm(s) { return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim(); }
+  function logos() { try { return (typeof cfgData !== 'undefined' && cfgData && cfgData.teamLogos) || {}; } catch (e) { return {}; } }
+  function mapa() {
+    var L = logos(), ks = Object.keys(L), f = ks.length + '|' + (ks[0] || '') + '|' + ((L[ks[0]] || '').length);
+    if (f !== cacheFirma) {
+      cacheFirma = f; cacheMapa = {}; cacheFuzzy = {};
+      ks.forEach(function (k) { if (L[k]) cacheMapa[norm(k)] = L[k]; });
+    }
+    return cacheMapa;
+  }
+  // Nombres de equipo que existen de verdad en la liga (para no confundir un texto cualquiera con un equipo)
+  var conocidos = null, conocidosFirma = '';
+  function nombresConocidos() {
+    try {
+      var gs = (typeof leagueGames !== 'undefined' && leagueGames) || [], f = gs.length + '|' + Object.keys(logos()).length;
+      if (f !== conocidosFirma) {
+        conocidosFirma = f; conocidos = {}; cacheFuzzy = {};
+        gs.forEach(function (g) { if (g) { if (g.teamA) conocidos[norm(g.teamA)] = g.teamA; if (g.teamB) conocidos[norm(g.teamB)] = g.teamB; } });
+        try { if (typeof activeTeamName === 'function') { var a = activeTeamName(); if (a) conocidos[norm(a)] = a; } } catch (e) {}
+        try { if (typeof rivalName !== 'undefined' && rivalName) conocidos[norm(rivalName)] = rivalName; } catch (e) {}
+      }
+    } catch (e) { conocidos = conocidos || {}; }
+    return conocidos;
+  }
+  function logoDe(nombre) {
+    var M = mapa(), n = norm(nombre);
+    if (!n || n.length > 45) return '';
+    if (M[n]) return M[n];
+    if (cacheFuzzy[n] !== undefined) return cacheFuzzy[n];
+    var K = nombresConocidos(), r = '';
+    if (K[n] && typeof teamNameMatch === 'function') {
+      var L = logos(), ks = Object.keys(L);
+      for (var i = 0; i < ks.length; i++) { try { if (L[ks[i]] && teamNameMatch(ks[i], K[n])) { r = L[ks[i]]; break; } } catch (e) {} }
+    }
+    cacheFuzzy[n] = r; return r;
+  }
+  function tieneLogos() { return Object.keys(mapa()).length > 0; }
+  var ESTILO = 'height:1.45em;width:auto;max-width:2.3em;object-fit:contain;vertical-align:-0.32em;margin-right:.38em;-webkit-print-color-adjust:exact;print-color-adjust:exact';
+
+  function yaTiene(nodo, padre, src) {
+    var p = nodo.previousSibling;
+    if (p && p.nodeType === 1 && p.tagName === 'IMG' && (p.className === 'bp-esc' || p.src === src)) return true;
+    var q = padre.previousElementSibling;
+    if (q && q.tagName === 'IMG' && q.src === src) return true;
+    var f = padre.firstElementChild;
+    if (f && f.tagName === 'IMG' && f.src === src) return true;
+    if (padre.parentNode && padre.parentNode.firstElementChild && padre.parentNode.firstElementChild.tagName === 'IMG' && padre.parentNode.firstElementChild.src === src) return true;
+    return false;
+  }
+  function decorar(raiz, doc) {
+    if (!raiz || !tieneLogos()) return 0;
+    doc = doc || document;
+    var n = 0, w;
+    try { w = doc.createTreeWalker(raiz, 4 /* SHOW_TEXT */, null); } catch (e) { return 0; }
+    var lista = [], t;
+    while ((t = w.nextNode())) lista.push(t);
+    lista.forEach(function (tx) {
+      var padre = tx.parentNode; if (!padre || padre.nodeType !== 1) return;
+      if (NO[String(padre.tagName).toUpperCase()]) return;
+      var txt = tx.nodeValue; if (!txt || txt.length > 60) return;
+      var s = txt.trim(); if (s.length < 2) return;
+      if (padre.closest && padre.closest('[data-sin-escudo],select,.bp-esc-no')) return;
+      var src = logoDe(s);
+      if (!src) {
+        // "Equipo A vs Equipo B": escudo delante de cada uno
+        var m = /^(.{2,40}?)(\s+(?:vs\.?|v\/s)\s+)(.{2,40})$/i.exec(s);
+        if (m) {
+          var sa = logoDe(m[1]), sb = logoDe(m[3]);
+          if (sa && sb && !(padre.firstElementChild && padre.firstElementChild.className === 'bp-esc')) {
+            var mk = function (u) { var im = doc.createElement('img'); im.className = 'bp-esc'; im.src = u; im.alt = ''; im.setAttribute('style', ESTILO); return im; };
+            var ini = txt.indexOf(m[1]);
+            padre.insertBefore(mk(sa), tx);
+            tx.nodeValue = txt.slice(0, ini) + m[1] + m[2];
+            if (tx.nextSibling) padre.insertBefore(mk(sb), tx.nextSibling); else padre.appendChild(mk(sb));
+            padre.insertBefore(doc.createTextNode(m[3] + txt.slice(ini + m[1].length + m[2].length + m[3].length)), tx.nextSibling.nextSibling || null);
+            n++;
+          }
+        }
+        return;
+      }
+      if (yaTiene(tx, padre, src)) return;
+      var im = doc.createElement('img'); im.className = 'bp-esc'; im.src = src; im.alt = ''; im.setAttribute('style', ESTILO);
+      padre.insertBefore(im, tx); n++;
+    });
+    return n;
+  }
+  function decorarHtml(h) {
+    try {
+      if (typeof h !== 'string' || h.length < 200 || !tieneLogos()) return h;
+      var doc = new DOMParser().parseFromString(h, 'text/html');
+      if (!decorar(doc.body, doc)) return h;
+      var dt = /^\s*<!doctype[^>]*>/i.exec(h);
+      return (dt ? dt[0] : '<!DOCTYPE html>') + '\n' + doc.documentElement.outerHTML;
+    } catch (e) { return h; }
+  }
+
+  // ── Pantalla: observa cambios y decora lo nuevo ──
+  var cola = [], temporizador = null, trabajando = false;
+  function pasada() {
+    temporizador = null; if (!tieneLogos()) { cola = []; logoCabecera(); return; }
+    trabajando = true;
+    try {
+      var l = cola; cola = [];
+      if (l.length > 400) decorar(document.body);
+      else l.forEach(function (nd) { if (nd.isConnected) decorar(nd.nodeType === 3 ? nd.parentNode : nd); });
+      logoCabecera();
+    } catch (e) {}
+    setTimeout(function () { trabajando = false; }, 0);
+  }
+  function programar(nd) { cola.push(nd); if (!temporizador) temporizador = setTimeout(pasada, 120); }
+
+  // ── Logo de la cabecera: si no hay escudo del club, usa el del equipo elegido ──
+  function logoCabecera() {
+    try {
+      var el = document.querySelector('.logo-icon'); if (!el || typeof cfgData === 'undefined' || !cfgData || cfgData.teamLogo) return;
+      var nom = (typeof activeTeamName === 'function') ? activeTeamName() : '', u = nom ? logoDe(nom) : '';
+      if (u) {
+        el.style.cssText += ';background-image:url(' + u + ');background-size:contain;background-repeat:no-repeat;background-position:center;background-color:transparent;display:';
+        el.textContent = ''; el.setAttribute('data-bp-esc', '1');
+      } else if (el.getAttribute('data-bp-esc') === '1') {
+        el.style.backgroundImage = ''; el.style.display = 'none'; el.removeAttribute('data-bp-esc');
+      }
+    } catch (e) {}
+  }
+
+  function enganchar() {
+    // observador de pantalla
+    try {
+      new MutationObserver(function (ms) {
+        if (trabajando) return;
+        for (var i = 0; i < ms.length; i++) {
+          var m = ms[i];
+          if (m.type === 'characterData') programar(m.target);
+          else for (var j = 0; j < m.addedNodes.length; j++) { var a = m.addedNodes[j]; if (a.nodeType === 1 || a.nodeType === 3) { if (a.className === 'bp-esc') continue; programar(a); } }
+        }
+      }).observe(document.body, { childList: true, subtree: true, characterData: true });
+    } catch (e) {}
+    // informes en vista previa (iframe) y exportados
+    try {
+      var d = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'srcdoc');
+      if (d && d.set && !d.set._bpEsc) {
+        var set0 = d.set, nuevo = function (v) { return set0.call(this, decorarHtml(v)); }; nuevo._bpEsc = true;
+        Object.defineProperty(HTMLIFrameElement.prototype, 'srcdoc', { configurable: true, enumerable: d.enumerable, get: d.get, set: nuevo });
+      }
+    } catch (e) {}
+    try {
+      var op = window.open;
+      if (typeof op === 'function' && !op._bpEsc) {
+        window.open = function () {
+          var w = op.apply(this, arguments);
+          try {
+            if (w && w.document && typeof w.document.write === 'function') {
+              var dw = w.document.write.bind(w.document);
+              w.document.write = function (h) { return dw(decorarHtml(h)); };
+            }
+          } catch (e) {}
+          return w;
+        };
+        window.open._bpEsc = true;
+      }
+    } catch (e) {}
+    try {
+      var cap = window._capturarInformeHTML;
+      if (typeof cap === 'function' && !cap._bpEsc) {
+        window._capturarInformeHTML = function () { return cap.apply(this, arguments).then(function (h) { return decorarHtml(h); }); };
+        window._capturarInformeHTML._bpEsc = true;
+      }
+    } catch (e) {}
+    try {
+      var ual = window.updateAppLogo;
+      if (typeof ual === 'function' && !ual._bpEsc) {
+        window.updateAppLogo = function () { var r = ual.apply(this, arguments); logoCabecera(); return r; };
+        window.updateAppLogo._bpEsc = true;
+      }
+    } catch (e) {}
+    programar(document.body);
+  }
+  window.BPEscudos = { decorar: decorar, decorarHtml: decorarHtml, logoDe: logoDe };
+  if (document.body) enganchar(); else document.addEventListener('DOMContentLoaded', enganchar);
+})();
+
+</script>
+ box deducido</div>
 </body>
 </html>
