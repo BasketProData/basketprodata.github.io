@@ -35540,6 +35540,7 @@ window.bpGuardia = function(){
 (function () {
   'use strict';
   var NO = { SCRIPT: 1, STYLE: 1, SELECT: 1, OPTION: 1, TEXTAREA: 1, INPUT: 1, NOSCRIPT: 1, TITLE: 1, CANVAS: 1, SVG: 1, TEXT: 1 };
+  var PRINT_CSS = "/* BasketPro \u00b7 cortes de p\u00e1gina prolijos en informes */\n@media print{\n  h1,h2,h3,h4,h5,.sit-h2,.sit-h3,.sec-t,.sec-title,.section-title,[class*=\"-h2\"],[class*=\"-h3\"]{break-after:avoid!important;page-break-after:avoid!important;break-inside:avoid!important}\n  h1+*,h2+*,h3+*,h4+*,.sit-h2+*,.sit-h3+*,.sit-sub+*{break-before:avoid!important;page-break-before:avoid!important}\n  .sit-sub{break-after:avoid!important;page-break-after:avoid!important}\n  tr,thead,li,figure,svg,canvas,img,blockquote,.sit-kpi,.sit-kpis,.sit-ficha,.sit-caja,.sit-tag,.fcard,.kpi,.statcard,.card,.stat-card,.kpi-card,.box,.alert,.alerta,.callout,.sit-nb,[class*=\"kpi\"],[class*=\"ficha\"],[class*=\"card\"]{break-inside:avoid!important;page-break-inside:avoid!important}\n  thead{display:table-header-group}\n  tfoot{display:table-footer-group}\n  p{orphans:3;widows:3}\n  table{break-inside:auto}\n  img,svg,canvas{max-width:100%}\n}\n@media print{\n  .doc-header,.doc-header+*,.doc-sec,.doc-section-title{break-after:avoid!important;page-break-after:avoid!important}\n  .doc-header{break-inside:avoid!important}\n  .doc-header+*{break-before:avoid!important;page-break-before:avoid!important}\n}\n";
   var cacheMapa = null, cacheFirma = '', cacheFuzzy = {};
   function norm(s) { return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim(); }
   function logos() { try { return (typeof cfgData !== 'undefined' && cfgData && cfgData.teamLogos) || {}; } catch (e) { return {}; } }
@@ -35637,6 +35638,19 @@ window.bpGuardia = function(){
     } catch (e) { return h; }
   }
 
+  // Informe listo para imprimir: escudos + cortes de página prolijos (los títulos no quedan solos al final de una hoja, las tarjetas y filas no se parten)
+  function procesarHtml(h) {
+    try {
+      if (typeof h !== 'string' || h.length < 200) return h;
+      h = decorarHtml(h);
+      if (h.indexOf('id="bp-print"') < 0 && /<\/head>/i.test(h)) {
+        var i = h.toLowerCase().lastIndexOf('</head>');
+        h = h.slice(0, i) + '<style id="bp-print">' + PRINT_CSS + '</style>' + h.slice(i);
+      }
+    } catch (e) {}
+    return h;
+  }
+
   // ── Pantalla: observa cambios y decora lo nuevo ──
   var cola = [], temporizador = null, trabajando = false;
   function pasada() {
@@ -35682,7 +35696,7 @@ window.bpGuardia = function(){
     try {
       var d = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'srcdoc');
       if (d && d.set && !d.set._bpEsc) {
-        var set0 = d.set, nuevo = function (v) { return set0.call(this, decorarHtml(v)); }; nuevo._bpEsc = true;
+        var set0 = d.set, nuevo = function (v) { return set0.call(this, procesarHtml(v)); }; nuevo._bpEsc = true;
         Object.defineProperty(HTMLIFrameElement.prototype, 'srcdoc', { configurable: true, enumerable: d.enumerable, get: d.get, set: nuevo });
       }
     } catch (e) {}
@@ -35694,7 +35708,7 @@ window.bpGuardia = function(){
           try {
             if (w && w.document && typeof w.document.write === 'function') {
               var dw = w.document.write.bind(w.document);
-              w.document.write = function (h) { return dw(decorarHtml(h)); };
+              w.document.write = function (h) { return dw(procesarHtml(h)); };
             }
           } catch (e) {}
           return w;
@@ -35705,7 +35719,7 @@ window.bpGuardia = function(){
     try {
       var cap = window._capturarInformeHTML;
       if (typeof cap === 'function' && !cap._bpEsc) {
-        window._capturarInformeHTML = function () { return cap.apply(this, arguments).then(function (h) { return decorarHtml(h); }); };
+        window._capturarInformeHTML = function () { return cap.apply(this, arguments).then(function (h) { return procesarHtml(h); }); };
         window._capturarInformeHTML._bpEsc = true;
       }
     } catch (e) {}
@@ -35718,7 +35732,7 @@ window.bpGuardia = function(){
     } catch (e) {}
     programar(document.body);
   }
-  window.BPEscudos = { decorar: decorar, decorarHtml: decorarHtml, logoDe: logoDe };
+  window.BPEscudos = { decorar: decorar, decorarHtml: decorarHtml, procesarHtml: procesarHtml, logoDe: logoDe };
   if (document.body) enganchar(); else document.addEventListener('DOMContentLoaded', enganchar);
 })();
 
