@@ -35734,6 +35734,69 @@ window.bpGuardia = function(){
     } catch (e) {}
     programar(document.body);
   }
+  // ── Escudos dentro de los gráficos SVG de la liga (dispersión, barras, cuatro factores) ──
+  function escS(x) { return String(x == null ? '' : x).replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'"); }
+  function idLogo(nombre) { var h = 5381, t = norm(nombre); for (var i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0; return 'bpl' + (h >>> 0).toString(36); }
+  function defLogo(usados, nombre, src) {
+    var id = idLogo(nombre);
+    if (!usados[id]) usados[id] = '<image id="' + id + '" width="100" height="100" preserveAspectRatio="xMidYMid meet" clip-path="url(#bpclip)" href="' + src + '" xlink:href="' + src + '"/>';
+    return id;
+  }
+  function usoLogo(id, cx, cy, d) { return '<use href="#' + id + '" xlink:href="#' + id + '" transform="translate(' + (cx - d / 2).toFixed(1) + ' ' + (cy - d / 2).toFixed(1) + ') scale(' + (d / 100).toFixed(4) + ')"/>'; }
+  function cierre(svg, usados) {
+    var ids = Object.keys(usados); if (!ids.length) return svg;
+    var defs = '<defs><clipPath id="bpclip" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath>' + ids.map(function (k) { return usados[k]; }).join('') + '</defs>';
+    svg = svg.replace('<svg ', '<svg xmlns:xlink="http://www.w3.org/1999/xlink" ');
+    return svg.replace(/(<svg [^>]*>)/, '$1' + defs);
+  }
+  function porNombre(rows, texto) {
+    var t = escS(texto).replace(/…$/, ''); if (!t) return null;
+    for (var i = 0; i < (rows || []).length; i++) { var n = rows[i] && rows[i].name; if (n && (n === t || String(n).indexOf(t) === 0)) return n; }
+    return null;
+  }
+  function svgDispersion(svg, rows) {
+    if (!svg || !tieneLogos()) return svg;
+    var porAbr = {}; (rows || []).forEach(function (r) { try { porAbr[_scAbr(r.name)] = r.name; } catch (e) {} });
+    var usados = {}, hubo = 0;
+    var out = svg.replace(/(<circle cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"[^>]*\/>)<text [^>]*>([^<]*)<\/text>/g, function (m, circ, cx, cy, r, ab) {
+      var nom = porAbr[escS(ab)], src = nom && logoDe(nom); if (!src) return m;
+      hubo = 1; return circ + usoLogo(defLogo(usados, nom, src), +cx, +cy, 2 * (+r) - 3);
+    });
+    return hubo ? cierre(out, usados) : svg;
+  }
+  function svgBarras(svg, rows) {
+    if (!svg || !tieneLogos()) return svg;
+    var usados = {}, hubo = 0, EXTRA = 20;
+    var out = svg.replace(/<text x="([\d.]+)" y="([\d.]+)" font-size="9\.5"([^>]*)text-anchor="end">([^<]*)<\/text>/g, function (m, x, y, resto, txt) {
+      var nom = porNombre(rows, txt), src = nom && logoDe(nom); if (!src) return m;
+      hubo = 1; return m + usoLogo(defLogo(usados, nom, src), 9, +y - 4, 15);
+    });
+    if (!hubo) return svg;
+    out = out.replace(/viewBox="0 0 (\d+) (\d+)"/, function (m, w, h) { return 'viewBox="0 0 ' + (+w + EXTRA) + ' ' + h + '"'; })
+             .replace(/max-width:(\d+)px/, function (m, w) { return 'max-width:' + (+w + EXTRA) + 'px'; });
+    // se corre el contenido a la derecha para hacer lugar al escudo
+    out = out.replace(/(<svg [^>]*>)([\s\S]*)(<\/svg>)/, function (m, a, c, z) {
+      var uses = [], c2 = c.replace(/<use [^>]*\/>/g, function (u) { uses.push(u); return ''; });
+      return a + '<g transform="translate(' + EXTRA + ' 0)">' + c2 + '</g>' + uses.join('') + z;
+    });
+    return cierre(out, usados);
+  }
+  function svgFactores(svg, rows, equipo) {
+    if (!svg || !tieneLogos()) return svg;
+    var nom = null; (rows || []).forEach(function (r) { try { if (!nom && _scEsNuestro(r.name, equipo)) nom = r.name; } catch (e) {} });
+    var src = nom && logoDe(nom); if (!src) return svg;
+    var usados = {}, id = defLogo(usados, nom, src);
+    var out = svg.replace(/(<circle cx="([\d.]+)" cy="([\d.]+)" r="8" fill="#6a4c93"[^>]*\/>)/g, function (m, c, cx, cy) { return c + usoLogo(id, +cx, +cy, 14); });
+    return out === svg ? svg : cierre(out, usados);
+  }
+  function envolverSVG(nombre, post) {
+    var o = window[nombre]; if (typeof o !== 'function' || o.__bpEsc) return;
+    var w = function (rows, equipo) { var r = o.apply(this, arguments); try { return post(r, rows, equipo); } catch (e) { return r; } };
+    w.__bpEsc = 1; window[nombre] = w;
+  }
+  envolverSVG('_sitScatter', svgDispersion);
+  envolverSVG('_sitBarrasLiga', svgBarras);
+  envolverSVG('_sitStripFactores', svgFactores);
   window.BPEscudos = { decorar: decorar, decorarHtml: decorarHtml, procesarHtml: procesarHtml, logoDe: logoDe };
   if (document.body) enganchar(); else document.addEventListener('DOMContentLoaded', enganchar);
 })();
@@ -35840,18 +35903,19 @@ window.bpGuardia = function(){
       var ord = nombres.map(function (n, k) { return { k: k, p: d.serie[k][i] || 0 }; }).sort(function (a, b) { return (b.p - a.p) || (a.k - b.k); });
       ord.forEach(function (o, rank) { pos[o.k][i] = rank + 1; });
     }
-    var W = 760, padL = 16, padR = 150, padT = 28, padB = 28, rowH = Math.max(18, Math.min(30, 420 / nE)), H = padT + padB + rowH * (nE - 1) + 10;
+    var W = 760, padL = 16, padR = 175, padT = 28, padB = 28, rowH = Math.max(18, Math.min(30, 420 / nE)), H = padT + padB + rowH * (nE - 1) + 10;
     var xs = function (i) { return padL + (W - padL - padR) * (nF === 1 ? 0 : i / (nF - 1)); }, ys = function (p) { return padT + rowH * (p - 1); };
     var PALL = (typeof PAL !== 'undefined' && PAL.length) ? PAL : ['#00c853', '#f57f17', '#1565c0', '#e53935', '#9c27b0', '#00bcd4', '#ff5722'];
     var s = '';
     d.fechas.forEach(function (f, i) { s += '<text x="' + xs(i).toFixed(1) + '" y="14" font-size="9.5" fill="#98a2b0" text-anchor="middle">' + (d.porNumeroDePartido ? 'PJ ' : 'F') + f + '</text>' +
       '<line x1="' + xs(i).toFixed(1) + '" y1="' + (padT - 6) + '" x2="' + xs(i).toFixed(1) + '" y2="' + (H - padB + 6) + '" stroke="#2a303a" stroke-width=".7"/>'; });
     nombres.forEach(function (n, k) {
-      var col = PALL[k % PALL.length], pts = pos[k].map(function (p, i) { return xs(i).toFixed(1) + ',' + ys(p).toFixed(1); });
+      var lg = (window.BPEscudos && BPEscudos.logoDe(n)) || '', col = PALL[k % PALL.length], pts = pos[k].map(function (p, i) { return xs(i).toFixed(1) + ',' + ys(p).toFixed(1); });
       var top = k < 3 ? 1 : 0.85;
       s += '<g><title>' + esc(n) + '</title><path d="M' + pts.join(' L') + '" fill="none" stroke="' + col + '" stroke-width="' + (k < 3 ? 3 : 2) + '" stroke-linejoin="round" opacity="' + top + '"/>' +
         pos[k].map(function (p, i) { return '<circle cx="' + xs(i).toFixed(1) + '" cy="' + ys(p).toFixed(1) + '" r="' + (i === nF - 1 ? 4.5 : 2.6) + '" fill="' + col + '"/>'; }).join('') +
-        '<text x="' + (xs(nF - 1) + 10).toFixed(1) + '" y="' + (ys(pos[k][nF - 1]) + 3.5).toFixed(1) + '" font-size="10.5" font-weight="' + (k < 3 ? 700 : 500) + '" fill="' + col + '">' + pos[k][nF - 1] + 'º ' + esc(n.length > 18 ? n.slice(0, 17) + '…' : n) + '</text></g>';
+        (lg ? '<image x="' + (xs(nF - 1) + 10).toFixed(1) + '" y="' + (ys(pos[k][nF - 1]) - 7).toFixed(1) + '" width="14" height="14" preserveAspectRatio="xMidYMid meet" href="' + lg + '"/>' : '') +
+        '<text x="' + (xs(nF - 1) + (lg ? 28 : 10)).toFixed(1) + '" y="' + (ys(pos[k][nF - 1]) + 3.5).toFixed(1) + '" font-size="10.5" font-weight="' + (k < 3 ? 700 : 500) + '" fill="' + col + '">' + pos[k][nF - 1] + 'º ' + esc(n.length > 18 ? n.slice(0, 17) + '…' : n) + '</text></g>';
     });
     cont.innerHTML = '<div class="card"><div class="card-t">📈 Posición en la tabla, fecha a fecha</div>' +
       '<div style="font-size:11px;color:var(--text3);margin:-2px 0 10px">Cada línea es un equipo. Arriba = líder. Pasá el mouse (o tocá) una línea para resaltarla. Puntos de tabla: 2 por victoria, 1 por derrota.</div>' +
