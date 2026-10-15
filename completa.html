@@ -35499,13 +35499,14 @@ window.bpGuardia = function(){
       try { var r = await pedir('cajas?liga_id=eq.' + encodeURIComponent(ID) + '&select=datos,actualizado', 25000); fila = r && r[0]; }
       catch(e) { offline = true; }
     }
-    var comp = null, act = null;
+    var comp = null, act = null, vips = null;
     if (fila && fila.datos) {
       comp = fila.datos; act = fila.actualizado;
+      if (!offline && ses) { try { vips = (await pedir('cajas_vip?liga_id=eq.' + encodeURIComponent(ID) + '&select=equipo,datos', 25000)) || []; } catch(e) { vips = null; } }
       try { Object.keys(localStorage).forEach(function(x){ if (x.indexOf('bpc_caja_') === 0) lsDel(x); }); } catch(e) {}
-      lsSet('bpc_caja_' + ID, JSON.stringify({ d: comp, a: act }));
+      lsSet('bpc_caja_' + ID, JSON.stringify({ d: comp, a: act, v: vips }));
     } else if (offline) {
-      try { var c = JSON.parse(lsGet('bpc_caja_' + ID) || 'null'); if (c) { comp = c.d; act = c.a; } } catch(e) {}
+      try { var c = JSON.parse(lsGet('bpc_caja_' + ID) || 'null'); if (c) { comp = c.d; act = c.a; vips = c.v || null; } } catch(e) {}
     } else {
       lsDel('bpc_caja_' + ID);
       return error(modo === 'suscripcion' ? 'Esta liga no está disponible (todavía no se publicó o no está incluida en tu suscripción).' : 'Esta liga todavía no tiene el análisis completo publicado.',
@@ -35515,6 +35516,8 @@ window.bpGuardia = function(){
     var caja;
     try { caja = JSON.parse(LZString.decompressFromBase64(comp)); if (!caja) throw new Error('vacío'); }
     catch(e) { return error('Los datos de esta liga no se pudieron leer. Probá de nuevo más tarde.'); }
+    var vipEq = [];   // ⭐ paquetes VIP que este usuario tiene autorizados (la base solo los entrega a quien corresponde)
+    try { (vips || []).forEach(function(r) { var x = JSON.parse(LZString.decompressFromBase64(r.datos)); ['pbpStore','accData','shotMapStore'].forEach(function(k) { if (x && x[k]) caja[k] = Object.assign(caja[k] || {}, x[k]); }); vipEq.push(r.equipo); }); } catch(e) { console.error(e); }
     var nombre = ID; ((ligas || []).forEach(function(l){ if (l.id === ID) nombre = l.nombre; }));
     try {
       bpSembrar({ registry: { activa: ID, ligas: [{ id: ID, nombre: nombre }] }, caja: caja });
@@ -35526,6 +35529,7 @@ window.bpGuardia = function(){
     if (ses && !offline) {
       try { var sb = await pedir('suscriptores?select=vence&email=eq.' + encodeURIComponent(ses.e || ''), 5000); if (sb && sb[0]) linea2 = 'Suscripción hasta ' + fechaCorta(sb[0].vence); } catch(e) {}
     }
+    if (vipEq.length) linea2 = (linea2 ? linea2 + ' · ' : '') + '⭐ VIP: ' + vipEq.join(', ');
     $('bp-est').innerHTML = esc((offline ? 'Sin conexión · ' : 'Actualizado ') + (act ? fecha(act) : '')) + (linea2 ? '<br>' + esc(linea2) : '');
     if (ses) { var sl = $('bp-salir'); sl.style.display = ''; sl.title = ses.e || ''; }
     var cg = $('bp-carga'); if (cg) cg.remove();
