@@ -36093,8 +36093,8 @@ window.bpGuardia = function(){
    ordena por jornadas. Jugadores, Comparador y Torneo quedan como están. */
 (function () {
   'use strict';
-  var PANELES = { alert: 'Alertas', evol: 'Tendencias', form: 'Tendencias', rival: 'Próximo rival', pre: 'Pre-partido', post: 'Post-partido', informes: 'Informes' };
-  var FUNCS = ['rAlerts', 'rEvol', 'rForm', 'rRival', 'rPre', 'rPost', 'rInformes'];
+  var PANELES = { eq: 'Equipo', av: 'Equipo', acc: 'Equipo', pbp: 'Equipo', alert: 'Alertas', evol: 'Tendencias', form: 'Tendencias', rival: 'Próximo rival', pre: 'Pre-partido', post: 'Post-partido', informes: 'Informes' };
+  var FUNCS = ['rEq', 'rAv', 'rAcc', 'rPbpPanel', 'rAlerts', 'rEvol', 'rForm', 'rRival', 'rPre', 'rPost', 'rInformes'];
   var abierta = null;   // jornada desplegada en el fixture
 
   function glob() { try { return typeof esVistaGlobal === 'function' && esVistaGlobal(); } catch (e) { return false; } }
