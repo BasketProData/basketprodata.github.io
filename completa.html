@@ -10792,8 +10792,9 @@ function rEvol() {
       if(stat==='OER') return adv(vm,rv).OER;
       if(stat==='eFG') return adv(vm,rv).eFGv;
       if(['TC2pct','TC3pct','TLpct'].includes(stat)){const k=stat.replace('pct','');return pc(sp(vm,k+'m'),sp(vm,k+'i'));}
-      return eMode==='acum'?sp(vm,stat):f1(sp(vm,stat)/Math.max(games.length,1));
+      return sp(vm,stat);
     });
+    if(eMode==='acum'&&!['OER','eFG','TC2pct','TC3pct','TLpct'].includes(stat)){let c=0;for(let i=0;i<data.length;i++){c+=data[i]||0;data[i]=Math.round(c*10)/10;}}
     datasets.push({label:'Equipo',data,borderColor:G,backgroundColor:G+'22',borderWidth:2.5,pointRadius:4,fill:false,spanGaps:true}); ci++;
   }
   evolSel.forEach(name=>{
@@ -10807,6 +10808,7 @@ function rEvol() {
       if(stat==='TLpct') return pc(r.TLm,r.TLi);
       return r[stat]||0;
     });
+    if(eMode==='acum'&&!['OER','eFG','TC2pct','TC3pct','TLpct'].includes(stat)){let c=0;for(let i=0;i<data.length;i++){if(data[i]!=null){c+=data[i];data[i]=Math.round(c*10)/10;}}}
     datasets.push({label:sn(name),data,borderColor:PAL[ci%PAL.length],backgroundColor:PAL[ci%PAL.length]+'22',borderWidth:2,pointRadius:3,fill:false,spanGaps:true}); ci++;
   });
   dc('cEv');charts['cEv']=new Chart(document.getElementById('cEv'),{type:'line',data:{labels:lbs,datasets},options:{...mkCO(),plugins:{legend:{position:'bottom',labels:{color:tickColor(),font:{size:10},boxWidth:10}}}}});
@@ -11019,7 +11021,7 @@ function rForm(){
     return n > 0 ? all.slice(-n) : all;
   })();
   const sL = statLabels;
-  let players = getPlayers().filter(p=>p.prom.MIN>=5);
+  let players = getPlayers().filter(p=>p.prom.MIN>=8);
 
   if(!players.length||games.length<2){
     document.getElementById('formTable').innerHTML='<p style="color:#555;padding:12px">Necesitás al menos 2 fechas seleccionadas.</p>';
@@ -11053,7 +11055,7 @@ function rForm(){
     const avg=f1(vals.reduce((a,b)=>a+b,0)/vals.length);
     const last2=vals.slice(-2), l2avg=last2.length?f1(last2.reduce((a,b)=>a+b,0)/last2.length):null;
     const diff=l2avg!==null?Math.round((l2avg-avg)*10)/10:0;
-    const thr=stat==='eFG'?3:stat==='PTS'?2:1;
+    const thr=(typeof _bpThr==='function')?_bpThr(stat,vals):(stat==='eFG'?3:stat==='PTS'?2:1);
     const arrow=Math.abs(diff)<=thr?`<span style="color:#555">→</span>`:diff>0?`<span style="color:var(--green);font-weight:700">↑ +${diff}</span>`:`<span style="color:var(--red);font-weight:700">↓ ${diff}</span>`;
     h+=`<tr><td style="font-weight:700;color:var(--text)">${sn(p.name)}</td><td style="color:var(--text2)">${avg}</td>`;
     games.forEach(g=>{
@@ -11070,7 +11072,7 @@ function rForm(){
     if(vals.length<2) return;
     const avg=vals.reduce((a,b)=>a+b,0)/vals.length;
     const last2=vals.slice(-2), l2avg=last2.reduce((a,b)=>a+b,0)/last2.length;
-    const thr=stat==='eFG'?3:stat==='PTS'?2:1;
+    const thr=(typeof _bpThr==='function')?_bpThr(stat,vals):(stat==='eFG'?3:stat==='PTS'?2:1);
     const isHot=l2avg>avg+thr&&last2.every(v=>v>=avg);
     const isCold=l2avg<avg-thr&&last2.every(v=>v<=avg);
     const d=document.createElement('div'); d.className='kpi'+(isHot?' hot':isCold?' cold':'');
@@ -35196,7 +35198,7 @@ window.bpIniciar = function(){
 </div>
 
 <div id="build-stamp" title="Versión del archivo que estás abriendo" style="position:fixed;left:10px;bottom:6px;z-index:50;font-size:10px;color:#8a8a8a;background:rgba(0,0,0,.35);padding:2px 8px;border-radius:10px;pointer-events:none">Versión 08/10/2026 16:00 · Excel con OT + origen del<style id="bp-publico-css">
-#nav-cfg,#nav-hist,#nav-alert,#build-stamp{display:none!important}
+#nav-cfg,#nav-hist,#build-stamp{display:none!important}
 .bp-oculto{display:none!important}
 /* ── Adaptación a celular: menú inferior, contenido a ancho completo ── */
 @media (max-width:820px){
@@ -35241,7 +35243,7 @@ window.bpIniciar = function(){
 </style>
 <script id="bp-publico-guardia">
 window.bpGuardia = function(){
-  var BLOQ = ["abrirCargaPartido", "borrarPartidosPBP", "diagnosticarPlantilla", "editarDatosDeFixture", "limpiarOrdenManual", "moverEnTabla", "openEtapaForm", "openNotaByFname", "openQByFname", "openVideoByFname", "openAccOrUpload", "showGestionModal", "exportBackup", "triggerImportBackup", "importBackupFile"], OCULTAS = ["cfg", "hist", "alert"];
+  var BLOQ = ["abrirCargaPartido", "borrarPartidosPBP", "diagnosticarPlantilla", "editarDatosDeFixture", "limpiarOrdenManual", "moverEnTabla", "openEtapaForm", "openNotaByFname", "openQByFname", "openVideoByFname", "openAccOrUpload", "showGestionModal", "exportBackup", "triggerImportBackup", "importBackupFile"], OCULTAS = ["cfg", "hist"];
   BLOQ.forEach(function(n){ window[n] = function(){ return false; }; });
   var swOrig = window.sw;
   window.sw = function(p){ if (OCULTAS.indexOf(p) >= 0) p = 'home'; return swOrig.apply(this, arguments.length ? [p].concat([].slice.call(arguments,1)) : [p]); };
@@ -35734,6 +35736,264 @@ window.bpGuardia = function(){
   }
   window.BPEscudos = { decorar: decorar, decorarHtml: decorarHtml, procesarHtml: procesarHtml, logoDe: logoDe };
   if (document.body) enganchar(); else document.addEventListener('DOMContentLoaded', enganchar);
+})();
+
+</script>
+<script id="bp-liga">
+/* BasketPro · la liga de un vistazo (Inicio), evolución de la liga (Tendencias) y criterio de "forma".
+   Reusa los gráficos del informe de situación del equipo (_sitScatter, _sitBarrasLiga, _sitStripFactores). */
+(function () {
+  'use strict';
+  var NADIE = '__ningun_equipo__';
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function oscuro() { try { return !document.body.classList.contains('light'); } catch (e) { return true; } }
+  var MAPA = { '#ececec': '#242a33', '#e5e0d5': '#2c333d', '#e9edf2': '#2a313b', '#8a97a6': '#667487', '#b9c3cf': '#566273', '#445': '#e3e8ef',
+    '#ddd': '#333b47', '#aaa': '#667487', '#888': '#98a2b0', '#666': '#aab3bf', '#555': '#c2cad5', '#444': '#d3d9e1', '#333': '#e3e8ef', '#999': '#8a94a2',
+    '#6a4c93': '#b08df0', '#3e2a63': '#d9c4ff', '#1b7a3d': '#3ddc84', '#c0392b': '#ff6b5b', '#7a6a00': '#e0c341' };
+  function tema(svg) {
+    if (!svg || !oscuro()) return svg || '';
+    return svg.replace(/#[0-9a-fA-F]{3,6}\b/g, function (m) { return MAPA[m.toLowerCase()] || m; })
+      .replace(/background:#fff/g, 'background:transparent').replace(/stroke="#fff"/g, 'stroke="#14181f"');
+  }
+  var r0 = function (v) { return Math.round(v); }, f1 = function (v) { return v.toFixed(1); }, sg = function (v) { return (v > 0 ? '+' : '') + v.toFixed(1); };
+  function filas() { try { return (typeof _filasLigaInforme === 'function') ? _filasLigaInforme() : []; } catch (e) { return []; } }
+  function sc(rows, eq, cfg) { return tema(_sitScatter(rows, eq, cfg)); }
+  function bar(rows, eq, k, alto, fm, o) { return tema(_sitBarrasLiga(rows, eq, k, alto, fm, o)); }
+  var DOS = function (a, b) { return '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px">' + a + b + '</div>'; };
+  var sub = function (t) { return '<div style="font-size:10.5px;color:var(--text3);margin:0 0 4px">' + t + '</div>'; };
+  var TABS = [
+    { id: 'mapa', t: 'Ataque vs defensa', n: 'Arriba y a la derecha: ataca bien y defiende bien a la vez.',
+      f: function (r, e) { return sc(r, e, { x: { k: 'OER', label: 'ORtg · puntos cada 100 posesiones →', fmt: r0 }, y: { k: 'DER', label: '← DRtg · puntos que recibe (menos = mejor)', fmt: r0, inv: true },
+        quad: { tr: 'Ataque y defensa de élite', tl: 'Defensa fuerte, ataque flojo', br: 'Ataque fuerte, defensa floja', bl: 'Flojo en las dos fases' }, w: 620, h: 380 }); } },
+    { id: 'net', t: 'Net rating', n: 'Ataque menos defensa (por 100 posesiones) y diferencia de puntos por partido. Línea punteada = media.',
+      f: function (r, e) { return DOS('<div>' + sub('Net rating') + bar(r, e, 'NET', true, sg) + '</div>', '<div>' + sub('Diferencia de puntos por partido') + bar(r, e, 'diff', true, sg) + '</div>'); } },
+    { id: 'rank', t: 'Ataque y defensa', n: 'Ranking de eficiencia: ORtg (más es mejor) y DRtg (menos es mejor).',
+      f: function (r, e) { return DOS('<div>' + sub('Ataque · ORtg') + bar(r, e, 'OER', true, f1) + '</div>', '<div>' + sub('Defensa · DRtg') + bar(r, e, 'DER', false, f1) + '</div>'); } },
+    { id: 'fact', t: 'Cuatro factores', n: 'Cada fila es un factor: a la derecha siempre es mejor. Violeta = el equipo; gris = el resto.',
+      f: function (r, e) { return tema(_sitStripFactores(r, e)); } },
+    { id: 'ritmo', t: 'Ritmo y resultado', n: '¿Quién gana jugando rápido y quién jugando lento?',
+      f: function (r, e) { return sc(r, e, { x: { k: 'pace', label: 'Ritmo (posesiones) →', fmt: r0 }, y: { k: 'NET', label: 'Net rating →', fmt: r0 },
+        quad: { tr: 'Rápido y ganador', tl: 'Lento y ganador', br: 'Rápido y perdedor', bl: 'Lento y perdedor' }, w: 620, h: 360 }); } },
+    { id: 'tiro', t: 'Tiro y pérdidas', n: 'Tira bien y cuida la pelota: arriba a la derecha.',
+      f: function (r, e) { return sc(r, e, { x: { k: 'eFG', label: 'eFG% (tiro) →', fmt: function (v) { return r0(v) + '%'; } }, y: { k: 'TOV', label: '← TOV% (menos = mejor)', fmt: function (v) { return r0(v) + '%'; }, inv: true },
+        quad: { tr: 'Tira bien, cuida', tl: 'Cuida, tira mal', br: 'Tira bien, pierde', bl: 'Tira mal, pierde' }, w: 620, h: 360 }); } }
+  ];
+  var tabAct = 'mapa';
+  function contenido(eq) {
+    var rows = filas(), t = TABS.filter(function (x) { return x.id === tabAct; })[0] || TABS[0];
+    var chips = TABS.map(function (x) {
+      var on = x.id === t.id;
+      return '<button onclick="bpLigaTab(\'' + x.id + '\')" style="padding:5px 11px;border-radius:14px;font-size:11px;cursor:pointer;border:1px solid ' + (on ? 'var(--green)' : 'var(--border2)') +
+        ';background:' + (on ? 'var(--green)' : 'transparent') + ';color:' + (on ? '#000' : 'var(--text2)') + ';font-weight:' + (on ? 700 : 500) + '">' + esc(x.t) + '</button>';
+    }).join('');
+    var cuerpo = rows.length < 4 ? '<div style="color:var(--text3);font-size:12px;padding:24px 0;text-align:center">Hacen falta al menos 4 equipos con partidos para comparar la liga.</div>'
+      : t.f(rows, eq || NADIE);
+    return '<div class="card-t">📊 La liga de un vistazo</div>' +
+      '<div style="font-size:11px;color:var(--text3);margin:-2px 0 10px">' + (eq ? 'Cada punto es un equipo; el tuyo, en violeta.' : 'Cada punto es un equipo de la liga.') + ' ' + esc(t.n) + '</div>' +
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">' + chips + '</div>' + cuerpo;
+  }
+  function pintar() { var c = document.getElementById('bp-liga-card'); if (c) c.innerHTML = contenido(c.getAttribute('data-eq') || ''); }
+  window.bpLigaTab = function (id) { tabAct = id; pintar(); };
+  var st = document.createElement('style');
+  st.textContent = '.bp-g2{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:12px;align-items:start}@media(max-width:900px){.bp-g2{grid-template-columns:1fr}}' +
+    '.bp-bump path{transition:stroke-width .12s,opacity .12s}.bp-bump g:hover path{stroke-width:4.5!important;opacity:1!important}';
+  document.head.appendChild(st);
+  function nuevoCard(eq) { var d = document.createElement('div'); d.className = 'card'; d.id = 'bp-liga-card'; d.setAttribute('data-eq', eq || ''); return d; }
+  function envolver(n, fn) {
+    var o = window[n]; if (typeof o !== 'function' || o.__bpLiga) return;
+    var w = function () { var r = o.apply(this, arguments); try { fn(); } catch (e) { try { console.warn('bp_liga', n, e); } catch (_) {} } return r; };
+    w.__bpLiga = 1; window[n] = w;
+  }
+  function global() { try { return typeof esVistaGlobal === 'function' && esVistaGlobal(); } catch (e) { return false; } }
+  // ── Inicio: vista general → reemplaza la evolución por la liga de un vistazo
+  envolver('rHomeGlobal', function () {
+    var cv = document.getElementById('cGlobalEvol'), card = cv && cv.closest('.card'); if (!card) return;
+    var grid = card.parentElement, ex = document.getElementById('bp-liga-card'); if (ex) ex.remove();
+    var nuevo = nuevoCard(''); grid.replaceChild(nuevo, card); grid.className = 'bp-g2'; grid.style.gridTemplateColumns = ''; pintar();
+  });
+  // ── Inicio: equipo elegido → se agrega antes de los gráficos del resumen
+  envolver('rHome', function () {
+    if (global()) return;
+    var ex = document.getElementById('bp-liga-card'); if (ex) ex.remove();
+    var anc = document.getElementById('home-charts'); if (!anc) return;
+    var eq = ''; try { eq = activeTeamName(); } catch (e) {}
+    var nuevo = nuevoCard(eq); nuevo.style.marginTop = '12px'; anc.parentNode.insertBefore(nuevo, anc); pintar();
+  });
+  // ── Tendencias · Evolución: en vista general, posición en la tabla fecha a fecha
+  function bump() {
+    var pan = document.getElementById('v-evol'); if (!pan) return;
+    var cont = document.getElementById('bp-evol-liga'), glob = global();
+    var oculta = ['.row', '#evolChks'].map(function (s) { return pan.querySelector(s); });
+    var graf = pan.querySelector('#cEv'); graf = graf && graf.closest('.card');
+    if (!glob) { if (cont) cont.style.display = 'none'; oculta.concat([graf]).forEach(function (e) { if (e) e.style.display = ''; }); return; }
+    oculta.concat([graf]).forEach(function (e) { if (e) e.style.display = 'none'; });
+    if (!cont) { cont = document.createElement('div'); cont.id = 'bp-evol-liga'; pan.appendChild(cont); }
+    cont.style.display = '';
+    var tabla = []; try { tabla = getTorneoTeams(); } catch (e) {}
+    var nombres = tabla.map(function (t) { return t.name; });
+    var d = null; try { d = _globalEvolucionDatos(nombres); } catch (e) {}
+    if (!d || !d.fechas || d.fechas.length < 2) { cont.innerHTML = '<div class="card"><div style="color:var(--text3);font-size:12px;padding:24px;text-align:center">Todavía no hay suficientes fechas para mostrar la evolución.</div></div>'; return; }
+    var nF = d.fechas.length, nE = nombres.length;
+    // posición en cada fecha (1 = líder); desempate por orden de la tabla final
+    var pos = nombres.map(function () { return []; });
+    for (var i = 0; i < nF; i++) {
+      var ord = nombres.map(function (n, k) { return { k: k, p: d.serie[k][i] || 0 }; }).sort(function (a, b) { return (b.p - a.p) || (a.k - b.k); });
+      ord.forEach(function (o, rank) { pos[o.k][i] = rank + 1; });
+    }
+    var W = 760, padL = 16, padR = 150, padT = 28, padB = 28, rowH = Math.max(18, Math.min(30, 420 / nE)), H = padT + padB + rowH * (nE - 1) + 10;
+    var xs = function (i) { return padL + (W - padL - padR) * (nF === 1 ? 0 : i / (nF - 1)); }, ys = function (p) { return padT + rowH * (p - 1); };
+    var PALL = (typeof PAL !== 'undefined' && PAL.length) ? PAL : ['#00c853', '#f57f17', '#1565c0', '#e53935', '#9c27b0', '#00bcd4', '#ff5722'];
+    var s = '';
+    d.fechas.forEach(function (f, i) { s += '<text x="' + xs(i).toFixed(1) + '" y="14" font-size="9.5" fill="#98a2b0" text-anchor="middle">' + (d.porNumeroDePartido ? 'PJ ' : 'F') + f + '</text>' +
+      '<line x1="' + xs(i).toFixed(1) + '" y1="' + (padT - 6) + '" x2="' + xs(i).toFixed(1) + '" y2="' + (H - padB + 6) + '" stroke="#2a303a" stroke-width=".7"/>'; });
+    nombres.forEach(function (n, k) {
+      var col = PALL[k % PALL.length], pts = pos[k].map(function (p, i) { return xs(i).toFixed(1) + ',' + ys(p).toFixed(1); });
+      var top = k < 3 ? 1 : 0.85;
+      s += '<g><title>' + esc(n) + '</title><path d="M' + pts.join(' L') + '" fill="none" stroke="' + col + '" stroke-width="' + (k < 3 ? 3 : 2) + '" stroke-linejoin="round" opacity="' + top + '"/>' +
+        pos[k].map(function (p, i) { return '<circle cx="' + xs(i).toFixed(1) + '" cy="' + ys(p).toFixed(1) + '" r="' + (i === nF - 1 ? 4.5 : 2.6) + '" fill="' + col + '"/>'; }).join('') +
+        '<text x="' + (xs(nF - 1) + 10).toFixed(1) + '" y="' + (ys(pos[k][nF - 1]) + 3.5).toFixed(1) + '" font-size="10.5" font-weight="' + (k < 3 ? 700 : 500) + '" fill="' + col + '">' + pos[k][nF - 1] + 'º ' + esc(n.length > 18 ? n.slice(0, 17) + '…' : n) + '</text></g>';
+    });
+    cont.innerHTML = '<div class="card"><div class="card-t">📈 Posición en la tabla, fecha a fecha</div>' +
+      '<div style="font-size:11px;color:var(--text3);margin:-2px 0 10px">Cada línea es un equipo. Arriba = líder. Pasá el mouse (o tocá) una línea para resaltarla. Puntos de tabla: 2 por victoria, 1 por derrota.</div>' +
+      '<div style="overflow-x:auto"><svg class="bp-bump" viewBox="0 0 ' + W + ' ' + H + '" width="100%" style="min-width:560px;max-width:' + W + 'px" xmlns="http://www.w3.org/2000/svg" font-family="sans-serif">' + s + '</svg></div></div>';
+  }
+  envolver('rEvol', bump);
+  // ── Tendencias · Forma: la "tendencia" se mide contra la variabilidad propia del jugador, no contra un número fijo
+  window._bpThr = function (stat, vals) {
+    var base = stat === 'eFG' ? 3 : (stat === 'PTS' ? 2 : 1), n = vals.length; if (n < 3) return base;
+    var m = vals.reduce(function (a, b) { return a + b; }, 0) / n, sd = Math.sqrt(vals.reduce(function (a, b) { return a + (b - m) * (b - m); }, 0) / n);
+    return Math.max(base, 0.6 * sd);
+  };
+})();
+
+</script>
+<script id="bp-lectura">
+/* BasketPro · modo solo lectura de la app pública.
+   El usuario sólo ve datos y filtra. Todo botón/campo cuya acción edita, carga, borra,
+   reinicia o administra se oculta (o se deshabilita) apenas aparece en pantalla.
+   Es de presentación: los datos de cada usuario son suyos (el navegador), nunca viajan. */
+(function () {
+  'use strict';
+  var EXACTAS = ['abrirCargaPartido','abrirExportPlanteles','abrirFusionJugadores','abrirProximaJornada','addPermWin','setPermanencia','resetPermanencia',
+    'addTorneo','archivarTorneo','assignColor','borrarPartidosPBP','borrarPartidosScouting','toggleBsEdit','saveBsEdit','cancelBsEdit','deleteLeague','deleteTorneo',
+    'promptCreateLeague','editLeagueConfig','editarDatosDeFixture','openEtapaForm','etapaSave','closeEtapaForm','exportBackup','importBackupFile','finalizarFaseRegular',
+    'reabrirFaseRegular','resetPlayoffBracket','limpiarOrdenManual','moverEnTabla','liberarAlmacenamiento','recomprimirEscudos','loadCfgLogo','quitarTeamLogo','uploadTeamLogo',
+    'perfUploadPhoto','pbpBorrar','pbpProcesar','openAccOrUpload','openNotaByFname','saveNota','openTorneoForm','closeTorneoForm','saveCfg','saveCurrentSeason','setAbrevEquipo',
+    'setPosicionJugador','removeTorneoGame','uploadRival','clearRival','clearVideo','saveVideo','openVideoByFname','watchVideo','openQByFname','saveQ','closeQ','diagnosticarPlantilla',
+    'doConfirmReset','addWin','undoWin','openColorPicker','renderAlmacenamiento','setPermanencia','closeWizard'];
+  var PREFIJOS = /^(_cp|_dt|_mj|_rev|_scout|_fj|_gestion|_ep|_accm|_btnReconstruir|accm[A-Z]|tf[A-Z]|wiz[A-Z]|cfg[A-Z]|_proxJornada)/;
+  var EX = {}; EXACTAS.forEach(function (n) { EX[n] = 1; });
+  function nombres(txt) {
+    var out = [], re = /([A-Za-z_$][\w$]*)\s*\(/g, m;
+    while ((m = re.exec(txt || ''))) out.push(m[1]);
+    return out;
+  }
+  function esAdmin(txt) {
+    var n = nombres(txt);
+    for (var i = 0; i < n.length; i++) if (EX[n[i]] || PREFIJOS.test(n[i])) return true;
+    return false;
+  }
+  // 1) CSS inmediato para los nombres exactos (sin parpadeo)
+  var css = EXACTAS.map(function (n) { return '[onclick*="' + n + '("]'; }).join(',') + '{display:none!important}' +
+    '[data-bp-ro-off]{opacity:.7;pointer-events:none}';
+  var st = document.createElement('style'); st.id = 'bp-lectura'; st.textContent = css; document.head.appendChild(st);
+
+  // 2) Barrido (prefijos, campos y tarjetas especiales)
+  function barrer() {
+    var els = document.querySelectorAll('[onclick],[onchange],[oninput]');
+    for (var i = 0; i < els.length; i++) {
+      var e = els[i];
+      if (e.__bpRo) continue;
+      var oc = e.getAttribute('onclick'), ch = e.getAttribute('onchange') || e.getAttribute('oninput');
+      if (oc && esAdmin(oc)) { e.style.setProperty('display', 'none', 'important'); e.__bpRo = 1; continue; }
+      if (ch && esAdmin(ch)) { e.disabled = true; e.readOnly = true; e.setAttribute('data-bp-ro-off', '1'); e.__bpRo = 1; }
+    }
+    // Permanencia / promoción: sólo se muestra si ya hay datos cargados (y de sólo lectura)
+    document.querySelectorAll('input[onchange*="setPermanencia"]').forEach(function (inp) {
+      var card = inp.closest('.card'); if (!card || card.__bpRo) return;
+      var ins = card.querySelectorAll('input[onchange*="setPermanencia"]'), hay = false;
+      ins.forEach(function (x) { if (x.value) hay = true; });
+      if (!hay) { card.style.setProperty('display', 'none', 'important'); card.__bpRo = 1; }
+    });
+    // Tarjetas administrativas que quedan vacías al ocultar su botón
+    document.querySelectorAll('.card,[class*=card]').forEach(function (c) {
+      if (c.__bpVacia || !c.children.length) return;
+      var txt = (c.textContent || '').replace(/\s+/g, ' ').trim();
+      if (/Avanzar a siguiente etapa/.test(txt) && txt.length < 400 && !c.querySelector('table')) {
+        var visible = false; c.querySelectorAll('button').forEach(function (b) { if (b.style.display !== 'none' && getComputedStyle(b).display !== 'none') visible = true; });
+        if (!visible) { c.style.setProperty('display', 'none', 'important'); c.__bpVacia = 1; }
+      }
+    });
+  }
+  // 3) Textos pensados para el administrador ("Cargá…", "finalizala…"): se neutralizan
+  var FRASES = [
+    [/\s*Cuando termine la fase regular, finalizala para congelar los cruces y empezar a cargar los playoffs\./g, ''],
+    [/\s*Los del play-by-play ya vienen ubicados; a los que no tienen les podés cargar los tiros por zona\./g, ''],
+    [/\s*Se carga desde el digitalizador de tiros de cada partido\./g, ''],
+    [/ El ✎ marca puestos fijados a mano desde la sección Torneo\./g, ' El ✎ marca puestos fijados a mano.']
+  ];
+  var HOJA = /^(B|I|STRONG|BR|EM)$/;
+  function textos() {
+    var w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null), n, lote = [];
+    while ((n = w.nextNode())) { if (!n.__bpTx && n.nodeValue && n.nodeValue.length > 20) lote.push(n); }
+    lote.forEach(function (t) {
+      t.__bpTx = 1; var v = t.nodeValue, o = v;
+      FRASES.forEach(function (f) { v = v.replace(f[0], f[1]); });
+      if (v !== o) t.nodeValue = v;
+    });
+    document.querySelectorAll('div,p,span,li').forEach(function (e) {
+      if (e.__bpTx2) return;
+      var t = (e.textContent || '').trim();
+      if (t.length < 12 || t.length > 320 || !/(Cargá|cargá|Subí|Importá|Andá a )/.test(t)) return;
+      for (var i = 0; i < e.children.length; i++) if (!HOJA.test(e.children[i].tagName)) return;   // sólo hojas
+      if (e.closest('button,label,select,option,script,style,textarea')) return;
+      e.__bpTx2 = 1;
+      if (/^Andá a /.test(t)) e.style.setProperty('display', 'none', 'important');
+      else e.textContent = 'Todavía no hay datos para mostrar.';
+    });
+  }
+  // 4) PBP / Tiros: sin datos publicados no hay nada que mostrar (la app original ofrecía cargarlos)
+  function sinPbp(id) { try { return typeof pbpStore !== 'undefined' && !pbpStore[id]; } catch (e) { return false; } }
+  function sinTiros(fname) {
+    try {
+      var gid = typeof _gameId === 'function' ? _gameId(fname) : null;
+      var ev = gid && typeof pbpEventosCrudos === 'function' ? pbpEventosCrudos(gid) : null;
+      if (ev && ev.length) return false;
+      var sm = typeof shotMapStore !== 'undefined' ? shotMapStore[fname] : null;
+      return !(sm && sm.length);
+    } catch (e) { return false; }
+  }
+  function botonesDatos() {
+    document.querySelectorAll('button[onclick^="abrirModalPlayByPlay("],button[onclick^="verMapaDeTiros("]').forEach(function (b) {
+      if (b.__bpD) return;
+      var oc = b.getAttribute('onclick'), m = /\(\s*'((?:\\'|[^'])*)'\s*\)/.exec(oc); if (!m) return;
+      var arg = m[1].replace(/\\'/g, "'");
+      var vacio = /^abrirModalPlayByPlay/.test(oc) ? sinPbp(arg) : sinTiros(arg);
+      if (vacio) { b.style.setProperty('display', 'none', 'important'); }
+      b.__bpD = 1;
+    });
+  }
+  function blindar() {   // por si algún camino llega igual: sin datos, no se abre el cargador
+    var a = window.abrirModalPlayByPlay, t = window.verMapaDeTiros;
+    if (typeof a === 'function' && !a.__bp) { window.abrirModalPlayByPlay = function (id) { if (sinPbp(id)) return; return a.apply(this, arguments); }; window.abrirModalPlayByPlay.__bp = 1; }
+    if (typeof t === 'function' && !t.__bp) { window.verMapaDeTiros = function (f) { if (sinTiros(f)) return; return t.apply(this, arguments); }; window.verMapaDeTiros.__bp = 1; }
+  }
+  function rotulos() {
+    document.querySelectorAll('button').forEach(function (b) {
+      if (b.__bpRt) return; var t = (b.textContent || '').trim();
+      if (/^Cargar rival/.test(t)) { b.textContent = 'Elegir rival →'; b.__bpRt = 1; }
+    });
+    document.querySelectorAll('div').forEach(function (d) {
+      if (d.__bpRt || d.children.length || (d.textContent || '').trim() !== 'Sin rival cargado') return;
+      d.textContent = 'Todavía no elegiste rival'; d.__bpRt = 1;
+    });
+  }
+  var pend = 0;
+  function programar() { if (pend) return; pend = requestAnimationFrame(function () { pend = 0; try { barrer(); textos(); botonesDatos(); blindar(); rotulos(); } catch (e) {} }); }
+  var obs = new MutationObserver(programar);
+  function iniciar() { obs.observe(document.body, { childList: true, subtree: true }); programar(); }
+  if (document.body) iniciar(); else document.addEventListener('DOMContentLoaded', iniciar);
+  window.BPLectura = { barrer: barrer, esAdmin: esAdmin };
 })();
 
 </script>
