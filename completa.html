@@ -36037,10 +36037,36 @@ window.bpGuardia = function(){
       b.__bpD = 1;
     });
   }
-  function blindar() {   // por si algún camino llega igual: sin datos, no se abre el cargador
+  function blindar() {
+    var w = window.sw;
+    if (typeof w === 'function' && !w.__bp) {   // nadie llega a Acciones/PBP sin datos publicados (ni por un enlace interno)
+      window.sw = function (v) {
+        try {
+          if ((v === 'pbp' && typeof pbpStore !== 'undefined' && !Object.keys(pbpStore || {}).length) ||
+              (v === 'acc' && typeof accData !== 'undefined' && !Object.keys(accData || {}).length)) v = 'home';
+        } catch (e) {}
+        return w.apply(this, [v].concat([].slice.call(arguments, 1)));
+      };
+      window.sw.__bp = 1;
+    }   // por si algún camino llega igual: sin datos, no se abre el cargador
     var a = window.abrirModalPlayByPlay, t = window.verMapaDeTiros;
     if (typeof a === 'function' && !a.__bp) { window.abrirModalPlayByPlay = function (id) { if (sinPbp(id)) return; return a.apply(this, arguments); }; window.abrirModalPlayByPlay.__bp = 1; }
     if (typeof t === 'function' && !t.__bp) { window.verMapaDeTiros = function (f) { if (sinTiros(f)) return; return t.apply(this, arguments); }; window.verMapaDeTiros.__bp = 1; }
+  }
+  // Secciones sin datos publicados: el usuario no ve ni el acceso (nada de "no se cargaron")
+  function seccionesVacias() {
+    var hayP = false, hayA = false;
+    try { hayP = typeof pbpStore !== 'undefined' && Object.keys(pbpStore || {}).length > 0; } catch (e) {}
+    try { hayA = typeof accData !== 'undefined' && Object.keys(accData || {}).length > 0; } catch (e) {}
+    var pares = [[hayP, ["#nav-pbp", "[onclick*=\"sw('pbp')\"]"]], [hayA, ["#nav-acc", "#gtab-acc", "[onclick*=\"sw('acc')\"]", "[onclick*=\"setGTab('acc')\"]"]]];
+    pares.forEach(function (par) {
+      par[1].forEach(function (sel) {
+        document.querySelectorAll(sel).forEach(function (e) {
+          if (par[0]) { if (e.__bpSv) { e.style.removeProperty('display'); e.__bpSv = 0; } }
+          else { e.style.setProperty('display', 'none', 'important'); e.__bpSv = 1; }
+        });
+      });
+    });
   }
   function rotulos() {
     document.querySelectorAll('button').forEach(function (b) {
@@ -36053,7 +36079,7 @@ window.bpGuardia = function(){
     });
   }
   var pend = 0;
-  function programar() { if (pend) return; pend = requestAnimationFrame(function () { pend = 0; try { barrer(); textos(); botonesDatos(); blindar(); rotulos(); } catch (e) {} }); }
+  function programar() { if (pend) return; pend = requestAnimationFrame(function () { pend = 0; try { barrer(); textos(); botonesDatos(); blindar(); rotulos(); seccionesVacias(); } catch (e) {} }); }
   var obs = new MutationObserver(programar);
   function iniciar() { obs.observe(document.body, { childList: true, subtree: true }); programar(); }
   if (document.body) iniciar(); else document.addEventListener('DOMContentLoaded', iniciar);
