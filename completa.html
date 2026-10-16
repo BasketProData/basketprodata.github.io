@@ -36066,8 +36066,9 @@ window.bpGuardia = function(){
     pares.forEach(function (par) {
       par[1].forEach(function (sel) {
         document.querySelectorAll(sel).forEach(function (e) {
-          if (par[0]) { if (e.__bpSv) { e.style.removeProperty('display'); e.__bpSv = 0; } }
-          else { e.style.setProperty('display', 'none', 'important'); e.__bpSv = 1; }
+          // al volver, se deja el display que la app le había puesto (el ítem del menú lateral nace oculto: es una pestaña de Equipo)
+          if (par[0]) { if (e.__bpSv) { e.style.display = e.__bpSvO || ''; e.__bpSv = 0; } }
+          else { if (!e.__bpSv) e.__bpSvO = e.style.display; e.style.setProperty('display', 'none', 'important'); e.__bpSv = 1; }
         });
       });
     });
