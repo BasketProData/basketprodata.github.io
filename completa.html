@@ -5719,7 +5719,7 @@ function pbpConstruirBoxScore(eventos, durCuarto) {
     if (!acc[k]) acc[k] = {
       _key:k, equipo:e.equipo, numero:e.numero||null, N:(e.jugador||'').toUpperCase().replace(/\s+/g,' ').trim(),
       MIN:0, PTS:0, TC2m:0, TC2i:0, TC3m:0, TC3i:0, TLm:0, TLi:0,
-      REB_O:0, REB_D:0, REB:0, AST:0, REC:0, PER:0, TAP:0, FP:0, VAL:0
+      REB_O:0, REB_D:0, REB:0, AST:0, REC:0, PER:0, TAP:0, FP:0, FC:0, FR:0, TR:0, VAL:0
     };
     // Completar nombre/número si aparecen más tarde.
     if (!acc[k].N && e.jugador) acc[k].N = e.jugador.toUpperCase().replace(/\s+/g,' ').trim();
@@ -5745,8 +5745,10 @@ function pbpConstruirBoxScore(eventos, durCuarto) {
     else if (t === 'ASISTENCIA') { f.AST++; }
     else if (t === 'RECUPERACION' || t === 'RECUPERO' || t === 'ROBO') { f.REC++; }
     else if (t === 'PERDIDA') { f.PER++; }
-    else if (t === 'TAPON' || t === 'TAP') { f.TAP++; }
-    else if (/^FALTA/.test(t)) { f.FP++; }
+    else if (t === 'TAPON' || t === 'TAP' || t === 'TAPON-COMETIDO') { f.TAP++; }
+    else if (t === 'TAPON-RECIBIDO') { f.TR++; }
+    else if (t === 'FALTA-RECIBIDA') { f.FR++; }
+    else if (/^FALTA/.test(t) || t === 'TECNICA' || t === 'TANTIDEPORTIVA' || t === 'DESCALIFICANTE') { f.FC++; f.FP++; }
   });
 
   // Minutos por jugador desde la reconstrucción de lineups (sustituciones).
@@ -5791,9 +5793,9 @@ function pbpConstruirBoxScore(eventos, durCuarto) {
     f._minEstimado = !hayMinReales; // marca para saber que es aproximado
     // Campos derivados que otras partes esperan.
     f.TCm = f.TC2m + f.TC3m; f.TCi = f.TC2i + f.TC3i;
-    // Valoración = (PTS + REB + AST + REC + TAP) - (tiros fallados + TL fallados + PER)
+    // Valoración igual a la del GES: (PTS + REB + AST + REC + TAP + FR) - (tiros fallados + PER + FC + tapones recibidos)
     const fallados = (f.TC2i - f.TC2m) + (f.TC3i - f.TC3m) + (f.TLi - f.TLm);
-    f.VAL = (f.PTS + f.REB + f.AST + f.REC + f.TAP) - (fallados + f.PER);
+    f.VAL = (f.PTS + f.REB + f.AST + f.REC + f.TAP + f.FR) - (fallados + f.PER + f.FC + f.TR);
     return f;
   });
 
@@ -19972,12 +19974,12 @@ function _htmlFuentesDatos(juegos, opt) {
   }
   const chip = (ok, txt) => ok ? `<span style="color:#1b7a3d;font-weight:700">✓${txt ? ' ' + txt : ''}</span>` : '<span style="color:#bbb">—</span>';
   const filas = f.map(x => `<tr><td>${_sitE(x.etq)}</td><td style="text-align:left">${_sitE(x.rival)}</td>
-      <td>${x.boxOrigen === 'pbp' ? '<span style="color:#a07d28" title="Armado desde el play-by-play: sin faltas, +/- ni valoración oficiales' + (x.boxInferido ? ' (deducido al comparar la valoración con la fórmula del PBP)' : '') + '">del PBP' + (x.boxInferido ? ' *' : '') + '</span>' : chip(true, x.boxOrigen === 'oficial' ? 'oficial' + (x.boxInferido ? ' *' : '') : '')}</td>
+      <td>${x.boxOrigen === 'pbp' ? '<span style="color:#a07d28" title="Armado desde el play-by-play: sin +/- ni minutos oficiales' + (x.boxInferido ? ' (deducido al comparar la valoración con la fórmula del PBP)' : '') + '">del PBP' + (x.boxInferido ? ' *' : '') + '</span>' : chip(true, x.boxOrigen === 'oficial' ? 'oficial' + (x.boxInferido ? ' *' : '') : '')}</td>
       <td>${chip(x.pbp, x.pbp ? (x.etiquetas ? 'con jugadas' : 'sin jugadas') : '')}</td>
       <td>${x.acc ? '<span style="color:#1b7a3d;font-weight:700">✓ ' + _sitE(x.acc) + '</span>' : '<span style="color:#bbb">—</span>'}</td></tr>`).join('');
   return `<div class="sit-nb"><div class="sit-h3">Qué datos hay de cada partido</div><div class="sit-sub">${frase}</div>
     <table class="sit-t"><thead><tr><th>Fecha</th><th style="text-align:left">Rival</th><th>Box score</th><th>Play-by-play</th><th>Acciones de juego</th></tr></thead><tbody>${filas}</tbody></table>
-    <div style="font-size:9.5px;color:#888;margin-top:-2px">${nota}${boxPbp.length ? ' El box "del PBP" no trae las faltas, el +/- ni la valoración oficiales: se completa sumando el Excel del GES al mismo partido.' : ''}${f.some(x => x.boxInferido) ? ' * Origen deducido en partidos cargados antes de que la app lo registrara.' : ''}</div></div>`;
+    <div style="font-size:9.5px;color:#888;margin-top:-2px">${nota}${boxPbp.length ? ' El box "del PBP" no trae el +/- ni los minutos oficiales (las faltas, tapones y valoración sí salen del PBP): se completa sumando el Excel del GES al mismo partido.' : ''}${f.some(x => x.boxInferido) ? ' * Origen deducido en partidos cargados antes de que la app lo registrara.' : ''}</div></div>`;
 }
 // Para el informe de UN partido.
 function _htmlFuentesPartido(g) {
