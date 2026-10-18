@@ -12860,7 +12860,8 @@ function rAcc() {
         const tl = g ? (vvm(g)||[]).reduce((s,p)=>s+(+p.TLm||0),0) : 0;
         return fg + tl;
       }
-      return d.vm.reduce((s,r)=>s+(r.a||0),0);
+      const _tlT = (d._origen === 'tablero' && d.tablero && d.tablero.tirosLibres && d.tablero.tirosLibres.vm) ? (+d.tablero.tirosLibres.vm.a || 0) : 0;
+      return d.vm.reduce((s,r)=>s+(r.a||0),0) + _tlT;
     };
     let _sumPtsTodas = 0;
     keysActivas.forEach(k => {
