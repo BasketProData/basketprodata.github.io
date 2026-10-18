@@ -2143,7 +2143,7 @@ body.light .hm-cell{border-color:rgba(0,0,0,.1)}
         <div class="modal-t" id="accModalTitle">Acciones del partido</div>
         <div class="modal-s" id="accModalSub"></div>
       </div>
-      <button class="btn btn-sm" onclick="document.getElementById('accModal').style.display='none'">✕ Cerrar</button>
+      <div style="display:flex;gap:6px"><button class="btn btn-sm" style="border-color:var(--green);color:var(--green);font-weight:700" onclick="document.getElementById('accModal').style.display='none';if(window.BPAcc)BPAcc.abrir({idx:accModalIdx})">➕ Sumar archivo</button><button class="btn btn-sm" onclick="document.getElementById('accModal').style.display='none'">✕ Cerrar</button></div>
     </div>
     <div style="display:flex;gap:6px;margin-bottom:10px">
       <button class="tab on" id="accm-vm" onclick="setAccModalTab('vm')">⚡ VM ofensivo</button>
@@ -12408,6 +12408,46 @@ function clearAcciones() {
 }
 
 // ── AGGREGATE ────────────────────────────────────────────────────────────
+var ACC_ORDER_BASE = {
+    'Ataque rapido':         ['Contraataque'],
+    'Transicion':            ['Trailer','Drag'],
+    'Ataque estacionado':    ['Pick Central Ball handler','Pick Central Big man',
+                              'Pick Lateral Ball handler','Pick Lateral Big man',
+                              'Bola interior','Indirectas','1x1','DHO',
+                              'Pase hacia afuera','Segundas oportunidades','Vs Zona'],
+    'Fuera de sistema':      ['Fuera de sistema'],
+    'Situaciones especiales':['ATO','Lateral','Fondo','Cierre']
+  };
+// Acciones que aparecen en cualquier informe y no están en el catálogo base: se suman al grupo "Otras acciones"
+function accRegistrarSubs(lista) {
+  try {
+    var conocidas = {}; ACC_GRUPOS_MANUAL.forEach(function(g){ g.subs.forEach(function(s){ conocidas[s] = 1; }); });
+    var ex = ACC_GRUPOS_MANUAL.find(function(g){ return g.__extra; });
+    (lista || []).forEach(function(s){
+      if (!s || conocidas[s]) return;
+      conocidas[s] = 1;
+      if (!ex) { ex = { cat:'Otras acciones', t:'Otras acciones', subs:[], __extra:true }; ACC_GRUPOS_MANUAL.push(ex); }
+      ex.subs.push(s);
+    });
+  } catch (e) {}
+}
+function accRegistrarExtras() {
+  var nuevos = [];
+  try { Object.values(accData || {}).forEach(function(d){ if (!d) return; ['vm','rv'].forEach(function(l){ (d[l] || []).forEach(function(r){ if (r && r.sub) nuevos.push(r.sub); }); }); }); } catch (e) {}
+  accRegistrarSubs(nuevos);
+}
+function accOrder() {
+  accRegistrarExtras();
+  var o = {}; Object.keys(ACC_ORDER_BASE).forEach(function(k){ o[k] = ACC_ORDER_BASE[k].slice(); });
+  var ex = ACC_GRUPOS_MANUAL.find(function(g){ return g.__extra; });
+  if (ex && ex.subs.length) o['Otras acciones'] = ex.subs.slice();
+  return o;
+}
+function accGruposExtra() {
+  accRegistrarExtras();
+  var ex = ACC_GRUPOS_MANUAL.find(function(g){ return g.__extra; });
+  return (ex && ex.subs.length) ? [{ t:'Otras acciones', ic:'➕', subs:ex.subs.slice() }] : [];
+}
 function getAccAggFiltered(mode, keys) {
   // Like getAccAgg but only for specific keys
   const byKey = {};
@@ -12421,9 +12461,7 @@ function getAccAggFiltered(mode, keys) {
     });
   });
   const n = Math.max(keys.length, 1);
-  const ORDER = {'Ataque rapido':['Contraataque'],'Transicion':['Trailer','Drag'],
-    'Ataque estacionado':['Pick Central Ball handler','Pick Central Big man','Pick Lateral Ball handler','Pick Lateral Big man','Bola interior','Indirectas','1x1','DHO','Pase hacia afuera','Segundas oportunidades','Vs Zona'],
-    'Fuera de sistema':['Fuera de sistema'],'Situaciones especiales':['ATO','Lateral','Fondo','Cierre']};
+  const ORDER = accOrder();
   const result=[];
   Object.entries(ORDER).forEach(([cat,subs])=>subs.forEach(sub=>{
     const r=byKey[cat+'|'+sub]||{cat,sub,a:0,i:0};
@@ -12452,16 +12490,7 @@ function getAccAgg(mode) {
   const n = Math.max(Object.keys(accData).length, 1);
 
   // Build in fixed order
-  const ORDER = {
-    'Ataque rapido':         ['Contraataque'],
-    'Transicion':            ['Trailer','Drag'],
-    'Ataque estacionado':    ['Pick Central Ball handler','Pick Central Big man',
-                              'Pick Lateral Ball handler','Pick Lateral Big man',
-                              'Bola interior','Indirectas','1x1','DHO',
-                              'Pase hacia afuera','Segundas oportunidades','Vs Zona'],
-    'Fuera de sistema':      ['Fuera de sistema'],
-    'Situaciones especiales':['ATO','Lateral','Fondo','Cierre'],
-  };
+  const ORDER = accOrder();
 
   const result = [];
   Object.entries(ORDER).forEach(([cat, subs]) => {
@@ -12541,6 +12570,7 @@ function accCardsHTML(rows, sortMode, tlInfo) {
     {t:'Fuera de sistema', ic:'🎲', subs:['Fuera de sistema']},
     {t:'Situaciones especiales', ic:'⭐', subs:['ATO','Lateral','Fondo','Cierre']},
   ];
+  try { accGruposExtra().forEach(function(g){ GRUPOS.push(g); }); } catch (e) {}
   // index por sub
   const bySub = {};
   rows.forEach(r => { bySub[r.sub] = r; });
@@ -12768,11 +12798,7 @@ function rAcc() {
     const src = accTabMode==='vm' ? d.vm : (rivalAccData['rivales']?rivalAccData['rivales'].rv:[]);
     const map = Object.fromEntries(src.map(r=>[r.cat+'|'+r.sub,r]));
     // Build in fixed order
-    const ORDER = {
-      'Ataque rapido':['Contraataque'],'Transicion':['Trailer','Drag'],
-      'Ataque estacionado':['Pick Central Ball handler','Pick Central Big man','Pick Lateral Ball handler','Pick Lateral Big man','Bola interior','Indirectas','1x1','DHO','Pase hacia afuera','Segundas oportunidades','Vs Zona'],
-      'Fuera de sistema':['Fuera de sistema'],'Situaciones especiales':['ATO','Lateral','Fondo','Cierre']
-    };
+    const ORDER = accOrder();
     rows = [];
     Object.entries(ORDER).forEach(([cat,subs])=>subs.forEach(sub=>{
       const r=map[cat+'|'+sub]||{cat,sub,a:0,i:0};
@@ -13035,6 +13061,7 @@ var _accManualOT = 0;          // cuántas columnas de suplementario se muestran
 var _accManualTablero = null;  // bloque del Tablero Acciones pegado (se guarda junto a las acciones)
 
 function openAccManual(fname, idx) {
+  try { accRegistrarExtras(); } catch(e) {}
   _accManualFname = fname;
   const g = (idx!=null && ag()[idx]) ? ag()[idx] : ag().find(x=>x.fname===fname);
   _accManualRival = g ? g.rival : '';
@@ -13173,8 +13200,8 @@ function tableroConstruir(j, lado, invertir) {
   const armar = eq => {
     const store = {}, acc = (j.acciones || {})[eq] || {};
     Object.keys(acc).forEach(nombre => {
-      const sub = TABLERO_ACC_A_SUB[_tabNorm(nombre)];
-      if (!sub) { if (_tabNorm(nombre) !== 'tiros libres') sinFila[nombre] = true; return; }
+      let sub = TABLERO_ACC_A_SUB[_tabNorm(nombre)];
+      if (!sub) { if (_tabNorm(nombre) === 'tiros libres') return; sub = String(nombre).trim(); if (!sub) return; sinFila[nombre] = true; }
       Object.keys(acc[nombre] || {}).forEach(q => {
         const n = parseInt(q, 10); if (isNaN(n) || n < 1) return;
         const v = acc[nombre][q] || {};
@@ -13271,7 +13298,7 @@ function _accmMostrarResumen() {
     + 'Los puntos ya vienen con el <b>valor del lanzamiento</b> (triple convertido 3/3, errado 0/3), igual que la planilla.'
     + (r.hayOT ? '<br>🕐 Trae <b>suplementarios</b>: van en sus propias columnas (OT), nunca en el cuarto 4.' : '')
     + (tbl.tirosLibres.vm.i ? '<br>Tiros libres (' + tbl.tirosLibres.vm.a + '/' + tbl.tirosLibres.vm.i + ' tuyos), pts tras pérdida (' + tbl.ptsTrasPerdida.vm + ' tuyos, ' + tbl.ptsTrasPerdida.rv + ' del rival), pérdidas, rebotes y faltas <b>no tienen fila en la planilla</b>: se guardan aparte junto a las acciones.' : '<br>Pts tras pérdida, pérdidas, rebotes y faltas no tienen fila en la planilla: se guardan aparte junto a las acciones.')
-    + (r.sinFila.length ? '<br>⚠️ Sin fila en BasketPro (no se cargan): ' + r.sinFila.map(escHtml).join(', ') : '')
+    + (r.sinFila.length ? '<br>➕ Acciones nuevas (se agregan al catálogo): ' + r.sinFila.map(escHtml).join(', ') : '')
     + (r.sinPos ? '<br>⚠️ El código no trae los puntos posibles: se estimaron.' : '') + '</div>'
     + '<div style="display:flex;gap:10px;margin-top:14px"><button class="btn" style="flex:1" onclick="_accmCerrarModal(\'accmPegarModal\')">Cancelar</button>'
     + '<button class="btn" style="flex:2;background:var(--green);color:#000;border:none;font-weight:700" onclick="accmAplicarPegado()">✓ Llenar la planilla</button></div>');
@@ -13282,7 +13309,7 @@ function accmAplicarPegado() {
   const g = _accmPartidoAbierto(), det = tableroLadoPropio(_accmPega.json, g);
   const r = tableroConstruir(_accmPega.json, det.lado, _accmPega.invertir);
   const vacio = () => ({ c1:{a:0,i:0}, c2:{a:0,i:0}, c3:{a:0,i:0}, c4:{a:0,i:0} });
-  _accManualData = { vm:{}, rv:{} };
+  try { accRegistrarSubs(Object.keys(r.vm).concat(Object.keys(r.rv))); } catch(e) {}
   ['vm','rv'].forEach(t => Object.keys(r[t]).forEach(sub => {
     const cu = vacio();
     Object.keys(r[t][sub]).forEach(c => { cu[c] = { a:r[t][sub][c].a, i:r[t][sub][c].i }; });
@@ -13330,7 +13357,7 @@ function renderAccManualBody() {
   const cab = (txt, al) => '<div style="text-align:' + al + '">' + txt + '</div>';
 
     let h = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'
-    + '<button class="btn btn-sm" onclick="accmAbrirPegar()" style="border-color:var(--green);color:var(--green);font-weight:700">📋 Pegar código del Tablero</button>'
+    + (window.BPAcc ? '<button class="btn btn-sm" onclick="BPAcc.abrir({fname:_accManualFname})" style="border-color:var(--green);color:var(--green);font-weight:700">📁 Cargar archivo (HTML, PDF, Excel)</button> ' : '') + '<button class="btn btn-sm" onclick="accmAbrirPegar()" style="border-color:var(--green);color:var(--green);font-weight:700">📋 Pegar código del Tablero</button>'
     + '<button class="btn btn-sm" onclick="accmAgregarOT()">＋ Suplementario</button>'
     + (nOT > 0 ? '<button class="btn btn-sm" onclick="accmQuitarOT()" title="Quita la última columna de suplementario (solo si está vacía)">− Quitar OT' + nOT + '</button>' : '')
     + '</div>'
@@ -13612,6 +13639,7 @@ function openAccOrUpload(idx, fname) {
   } else {
     // Sin datos: ofrecer carga a mano ahí mismo, o derivar al wizard unificado
     // (que ya cubre Excel y manual con la validación de partido correspondiente).
+    if (window.BPAcc) { BPAcc.abrir({ fname: fname, idx: idx }); return; }
     if (confirm('No hay acciones para "' + fname + '".\n\n¿Querés cargarlas a mano ahora mismo?\n\nAceptar = planilla manual · Cancelar = ver otras opciones')) {
       openAccManual(fname, idx);
     } else {
@@ -14349,16 +14377,7 @@ function getRivalAccAgg(mode) {
   });
 
   // Return in fixed ORDER
-  const ORDER = {
-    'Ataque rapido':         ['Contraataque'],
-    'Transicion':            ['Trailer','Drag'],
-    'Ataque estacionado':    ['Pick Central Ball handler','Pick Central Big man',
-                              'Pick Lateral Ball handler','Pick Lateral Big man',
-                              'Bola interior','Indirectas','1x1','DHO',
-                              'Pase hacia afuera','Segundas oportunidades','Vs Zona'],
-    'Fuera de sistema':      ['Fuera de sistema'],
-    'Situaciones especiales':['ATO','Lateral','Fondo','Cierre'],
-  };
+  const ORDER = accOrder();
   const result = [];
   Object.entries(ORDER).forEach(([cat, subs]) => {
     subs.forEach(sub => {
@@ -22447,6 +22466,7 @@ function exportAcc(type) {
     {t:'Fuera de sistema', subs:['Fuera de sistema']},
     {t:'Situaciones especiales', subs:['ATO','Lateral','Fondo','Cierre']},
   ];
+  try { accGruposExtra().forEach(function(g){ GRUPOS.push(g); }); } catch (e) {}
   const bySub = {}; rows.forEach(r=>{ bySub[r.sub]=r; });
   const colOf = (pct,has)=> !has ? '#999' : pct>=60 ? '#1a7a3c' : pct>=40 ? '#b5701a' : '#b53030';
 
@@ -26829,7 +26849,7 @@ function _cpHtmlStep1() {
     + tarjeta('acciones', '#c9a227', '📋', 'Acciones de juego', 'Desglose de jugadas (contraataque, pick and roll, 1x1...) de un partido ya cargado', accionesDisabled, accionesMotivo);
 }
 
-function _cpSetTipo(t) { _cp.tipo = t; _cp.step = 3; _cpRender(); }
+function _cpSetTipo(t) { if (t === 'acciones' && window.BPAcc) { _cpCerrar(); BPAcc.abrir({}); return; } _cp.tipo = t; _cp.step = 3; _cpRender(); }
 
 // ── PASO 2: cargar archivo ──
 function _cpHtmlStep2() {
