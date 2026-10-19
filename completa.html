@@ -7724,14 +7724,14 @@ function _dtZonasATiros() {
           const rOff = ((Math.floor(k/3) % 3) - 1) * 10;
           const ang = (aMid + aOff) * Math.PI/180;
           const rad = Math.max(6, rMid + rOff);
-          // Del lienzo horizontal a las coordenadas 0-100 que usa el mapa.
+          // Del lienzo horizontal a centímetros del Tablero (los que usa la carta de tiro), rotando la cancha.
           const px = CTH_ARO_X + rad*Math.cos(ang);
           const py = CTH_ARO_Y - rad*Math.sin(ang);
           out.push({
             equipo: eq,
             tipo: hecho ? ('CANASTA-'+Z.pts+'P') : ('TIRO'+Z.pts+'-FALLADO'),
-            x: Math.max(1, Math.min(99, 100 - (px/CTH_W*100))),
-            y: Math.max(1, Math.min(99, 100 - (py/CTH_H*100))),
+            x: Math.max(1, Math.min(1499, Math.round(750 - (py - CTH_ARO_Y)/CTH_PXM*100))),
+            y: Math.max(1, Math.min(1399, Math.round(157.5 + (CTH_ARO_X - px)/CTH_PXM*100))),
             _zona: Z.k, _porZona: true
           });
         }
@@ -8186,26 +8186,36 @@ function _dtGuardar() {
 // Visor independiente del mapa de tiros de un partido: usa el PBP automático si
 // lo hay, o el digitalizado a mano si no. No depende de que el partido tenga un
 // análisis de PBP completo (por eso es aparte del informe de Play-by-Play).
+function _htmlMapaZonasPartido(zn, nombreLocal, nombreVisita) {
+  const col = (z, nombre) => (z && Object.keys(z).length) ? _svgMapaZonasDe(z, escHtml(nombre || ''), 'Este partido', {ancho:320, imprimible:true}) : '';
+  const a = col(zn.local, nombreLocal), b = col(zn.visitante, nombreVisita);
+  return '<h2>🎯 Mapa de tiros</h2><div style="display:flex;gap:16px;flex-wrap:wrap"><div style="flex:1;min-width:280px">' + a + '</div><div style="flex:1;min-width:280px">' + b + '</div></div>'
+    + '<div style="margin-top:6px;font-size:9px;color:#888">Cada zona muestra aciertos/intentos y % de efectividad. El color compara con el promedio de la liga.</div>';
+}
 function verMapaDeTiros(fname) {
   const g = leagueGames.find(x => x.fname === fname) || (typeof ag==='function' ? ag().find(x=>x.fname===fname) : null);
   const gid = (typeof _gameId==='function') ? _gameId(fname) : null;
   let eventos = (gid && typeof pbpEventosCrudos==='function') ? pbpEventosCrudos(gid) : null;
   if (!eventos && shotMapStore[fname]) eventos = shotMapStore[fname];
-  if (!eventos || !eventos.length) {
+  const _zn = shotMapStore['_zonas_' + fname];
+  const _hayZn = !!(_zn && ((_zn.local && Object.keys(_zn.local).length) || (_zn.visitante && Object.keys(_zn.visitante).length)));
+  const _hayCoord = !!(eventos && eventos.some(e => e && e.x != null && e.y != null && /^(CANASTA-[23]P|TIRO[23]-FALLADO)$/.test(e.tipo || '')));
+  if (!_hayCoord && !_hayZn) {
     // En vez de un aviso sin salida, se ofrece cargarlo en el momento.
-    if (confirm('Este partido todavía no tiene mapa de tiros.\n\n¿Querés cargarlo ahora?\n\nPodés subir una captura de la web y marcar los tiros encima (o detectarlos por color).')) {
+    if (confirm('Este partido todavía no tiene mapa de tiros con posición.\n\n¿Querés cargarlo ahora?\n\nEn la Liga Argentina y la Femenina podés pegar el HTML del mapa oficial; en cualquier liga podés cargar las zonas a mano.')) {
       if (typeof abrirDigitalizadorTiros === 'function') abrirDigitalizadorTiros(fname);
     }
     return;
   }
-  const nombreLocal = g ? (g.teamA || activeTeamName()) : 'Local';
-  const nombreVisita = g ? (g.teamB || g.rival || 'Visitante') : 'Visitante';
+  let nombreLocal = g ? (g.teamA || activeTeamName()) : 'Local';
+  let nombreVisita = g ? (g.teamB || g.rival || 'Visitante') : 'Visitante';
+  if (g && !g.teamA && g.location === 'V') { nombreLocal = g.rival || 'Local'; nombreVisita = activeTeamName(); }
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Mapa de tiros — ${escHtml(fname)}</title>
     <style>@page{margin:14mm} body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#1a1a2e;max-width:700px;margin:0 auto;padding:20px}
     h2{font-size:16px}</style></head><body>
     <div style="font-size:11px;color:#888;text-transform:uppercase;font-weight:700">Mapa de tiros</div>
     <div style="font-size:20px;font-weight:900;margin-bottom:12px">${escHtml(fname)}</div>
-    ${_htmlMapaDeTiros(eventos, nombreLocal, nombreVisita)}
+    ${_hayZn ? _htmlMapaZonasPartido(_zn, nombreLocal, nombreVisita) : _htmlMapaDeTiros(eventos || [], nombreLocal, nombreVisita)}
     <div style="margin-top:16px;padding-top:10px;border-top:1px solid #eee;font-size:9px;color:#aaa;text-align:center">Generado con BasketPro</div>
     </body></html>`;
   let modal = document.getElementById('informe-jornada-modal');
