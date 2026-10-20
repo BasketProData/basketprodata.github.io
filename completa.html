@@ -36318,9 +36318,125 @@ window.bpGuardia = function(){
   }
   var pend = 0;
   function programar() { if (pend) return; pend = requestAnimationFrame(function () { pend = 0; try { barra(); } catch (e) {} }); }
-  function iniciar() { new MutationObserver(programar).observe(document.body, { childList: true, subtree: true }); programar(); }
+  function iniciar() { envolverFt(); new MutationObserver(programar).observe(document.body, { childList: true, subtree: true }); programar(); }
   if (document.body) iniciar(); else document.addEventListener('DOMContentLoaded', iniciar);
-  window.BPFixture = { leer: leer, grupos: grupos, mismo: mismo, conFechas: conFechas, fechas: fechas, hay: hay, diaTxt: diaTxt, abrir: abrir };
+
+  // ── Calendario por día (todos los partidos de la conferencia: jugados y por jugar) ──
+  var CAL = { filtro: 'todos', equipo: null, vista: 'eq' };   // equipo: null = automático (el activo, si hay), '' = todos
+  function glob() { try { return typeof esVistaGlobal === 'function' && esVistaGlobal(); } catch (e) { return false; } }
+  function miEq() { try { return glob() ? '' : (typeof activeTeamName === 'function' ? activeTeamName() : ''); } catch (e) { return ''; } }
+  function hoyISO() { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+  function partidos() {   // lista plana, con su marcador y su box score si está cargado
+    var c = cfg(); if (!hay()) return [];
+    var its = conFechas(c.fixtureOficial.items), gs = juegos(), usados = {}, out = [];
+    its.forEach(function (it) {
+      var g = null; for (var i = 0; i < gs.length; i++) if (!usados[i] && mismo(it.l, gs[i].teamA) && mismo(it.v, gs[i].teamB)) { g = gs[i]; usados[i] = 1; break; }
+      out.push({ l: it.l, v: it.v, d: it.d || (g && esISO(g.fechaDia) ? g.fechaDia : ''), h: it.h, c: it.c, fecha: it.fecha, fname: g ? g.fname : null, jugado: !!(g || it.j), a: g ? g.scoreA : it.a, b: g ? g.scoreB : it.b });
+    });
+    gs.forEach(function (g, i) {
+      if (usados[i] || (typeof isPlayoffGame === 'function' && isPlayoffGame(g))) return;
+      var n = (typeof _fechaNum === 'function') ? _fechaNum(g) : 0; if (!isFinite(n) || n === 9999) n = 0;
+      out.push({ l: g.teamA, v: g.teamB, d: esISO(g.fechaDia) ? g.fechaDia : '', h: '', c: '', fecha: n, fname: g.fname, jugado: true, a: g.scoreA, b: g.scoreB });
+    });
+    return out;
+  }
+  function esISO(d) { return /^\d{4}-\d{2}-\d{2}$/.test(String(d || '')); }
+  function diaLargo(d) {
+    var x = new Date(d + 'T12:00:00'), dias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'], meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+    return dias[x.getDay()] + ' ' + x.getDate() + ' de ' + meses[x.getMonth()] + (x.getFullYear() !== new Date().getFullYear() ? ' ' + x.getFullYear() : '');
+  }
+  function logoEq(n) { try { return (window.BPEscudos && BPEscudos.logoDe(n)) || ''; } catch (e) { return ''; } }
+  function inyectarCss() {
+    if (document.getElementById('bp-cal-css')) return;
+    var st = document.createElement('style'); st.id = 'bp-cal-css';
+    st.textContent =
+      '.bpc-top{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}' +
+      '.bpc-seg{display:inline-flex;border:1px solid var(--border2,#333);border-radius:9px;overflow:hidden}' +
+      '.bpc-seg button{background:transparent;border:0;color:var(--text2,#bbb);font:inherit;font-size:12px;font-weight:700;padding:6px 11px;cursor:pointer}' +
+      '.bpc-seg button.on{background:var(--green,#2ecc71);color:#000}' +
+      '.bpc-top select{background:var(--bg3,#222);color:var(--text,#eee);border:1px solid var(--border2,#333);border-radius:8px;padding:6px 8px;font:inherit;font-size:12px;max-width:100%}' +
+      '.bpc-res{font-size:11.5px;color:var(--text3,#888);margin:0 0 10px}' +
+      '.bpc-dia{display:flex;align-items:center;gap:8px;padding:14px 4px 6px;font-size:12.5px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--text,#eee)}' +
+      '.bpc-dia small{font-size:10.5px;color:var(--text3,#888);font-weight:600;text-transform:none;letter-spacing:0}' +
+      '.bpc-hoy{background:var(--green,#2ecc71);color:#000;border-radius:20px;padding:1px 8px;font-size:9.5px;font-weight:800;letter-spacing:.4px}' +
+      '.bpc-card{border:1px solid var(--border,#2a2a2a);border-radius:12px;overflow:hidden;background:var(--bg2,transparent)}' +
+      '.bpc-row{display:grid;grid-template-columns:54px 1fr 84px 1fr 108px;gap:10px;align-items:center;padding:10px 12px;border-top:1px solid var(--border,#2a2a2a)}' +
+      '.bpc-row:first-child{border-top:0}' +
+      '.bpc-row.mio{background:color-mix(in srgb,var(--green,#2ecc71) 12%,transparent)}' +
+      '.bpc-h{font-size:12px;font-weight:700;color:var(--text2,#bbb)}' +
+      '.bpc-eq{font-size:13px;display:flex;align-items:center;gap:6px;min-width:0}.bpc-eq.r{justify-content:flex-end;text-align:right}' +
+      '.bpc-eq span{overflow:hidden;text-overflow:ellipsis}.bpc-eq img{width:20px;height:20px;object-fit:contain;flex:none}' +
+      '.bpc-w{font-weight:800;color:var(--text,#eee)}' +
+      '.bpc-sc{font-weight:900;font-size:15px;white-space:nowrap;text-align:center;min-width:74px}' +
+      '.bpc-pend{color:var(--text3,#888);font-weight:600;font-size:12px}' +
+      '.bpc-x{font-size:10.5px;color:var(--text3,#888);grid-column:2/-1;margin-top:-4px}' +
+      '.bpc-row .btn{white-space:nowrap}' +
+      '@media(max-width:620px){.bpc-row{grid-template-columns:48px 1fr auto;row-gap:2px}.bpc-eq.r{justify-content:flex-start;text-align:left}.bpc-h{grid-row:1/3}.bpc-sc{grid-row:1/3;grid-column:3}.bpc-row .btn{grid-column:2/-1}.bpc-x{grid-column:2/-1}}';
+    document.head.appendChild(st);
+  }
+  function eqsCal(P) { var s = {}; P.forEach(function (e) { s[e.l] = 1; s[e.v] = 1; }); return Object.keys(s).sort(); }
+  function calHtml() {
+    inyectarCss();
+    var P = partidos(), hoy = hoyISO(), yo = miEq();
+    var eq = CAL.equipo == null ? (yo ? (eqsCal(P).filter(function (n) { return mismo(n, yo); })[0] || '') : '') : CAL.equipo;
+    var tot = P.length, jug = P.filter(function (e) { return e.jugado; }).length;
+    var V = P.filter(function (e) { return !eq || mismo(e.l, eq) || mismo(e.v, eq); });
+    var vj = V.filter(function (e) { return e.jugado; }).length;
+    if (CAL.filtro === 'prox') V = V.filter(function (e) { return !e.jugado; }); else if (CAL.filtro === 'jug') V = V.filter(function (e) { return e.jugado; });
+    var dias = {}, sinDia = [];
+    V.forEach(function (e) { if (e.d) (dias[e.d] = dias[e.d] || []).push(e); else sinDia.push(e); });
+    var ks = Object.keys(dias).sort(); if (CAL.filtro === 'jug') ks.reverse();
+    var proxDia = Object.keys(dias).sort().filter(function (k) { return k >= hoy; })[0];
+    var seg = function (items, cur, fn) { return '<div class="bpc-seg">' + items.map(function (it) { return '<button class="' + (it[0] === cur ? 'on' : '') + '" onclick="BPFixture.cal.' + fn + '(\'' + it[0] + '\')">' + it[1] + '</button>'; }).join('') + '</div>'; };
+    var h = '<div class="bpc-top" data-sin-escudo="1">' + seg([['todos', 'Todos'], ['prox', 'Por jugar'], ['jug', 'Jugados']], CAL.filtro, 'filtro') +
+      '<select onchange="BPFixture.cal.equipo(this.value)"><option value="">Todos los equipos</option>' + eqsCal(P).map(function (n) { return '<option value="' + esc(n) + '"' + (eq === n ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') + '</select>' +
+      (proxDia ? '<button class="btn btn-sm" style="border-color:var(--green);color:var(--green)" onclick="BPFixture.cal.proximo()">⏭ Próximo día</button>' : '') + '</div>' +
+      '<div class="bpc-res">' + (eq ? esc(eq) + ': ' + V.length + ' partido' + (V.length !== 1 ? 's' : '') + ' (' + vj + ' jugados · ' + (P.filter(function (e) { return mismo(e.l, eq) || mismo(e.v, eq); }).length - vj) + ' por jugar)' : tot + ' partidos de la conferencia · ' + jug + ' jugados · ' + (tot - jug) + ' por jugar') + '</div>';
+    if (!V.length) return h + '<div class="bpc-res" style="text-align:center;padding:24px">No hay partidos para este filtro.</div>';
+    var fila = function (e) {
+      var f = e.fname ? String(e.fname).replace(/\\/g, '\\\\').replace(/'/g, "\\'") : '', lgL = logoEq(e.l), lgV = logoEq(e.v);
+      var centro = e.jugado ? esc(e.a) + ' — ' + esc(e.b) : '<span class="bpc-pend">' + (e.d && e.d < hoy ? 'sin resultado' : 'por jugar') + '</span>';
+      var btn = e.fname ? '<button class="btn btn-sm" style="border-color:var(--green);color:var(--green)" onclick="openBSByFname(\'' + f + '\')">📋 Box Score</button>' : '';
+      var extra = [e.c, e.fecha ? 'Fecha ' + e.fecha : ''].filter(Boolean).join(' · ');
+      return '<div class="bpc-row"><div class="bpc-h">' + esc(e.h || (e.d ? '—' : '')) + '</div>' +
+        '<div class="bpc-eq' + (e.jugado && e.a > e.b ? ' bpc-w' : '') + '">' + (lgL ? '<img alt="" src="' + esc(lgL) + '">' : '') + '<span>' + esc(e.l) + '</span></div><div class="bpc-sc">' + centro + '</div>' +
+        '<div class="bpc-eq r' + (e.jugado && e.b > e.a ? ' bpc-w' : '') + '"><span>' + esc(e.v) + '</span>' + (lgV ? '<img alt="" src="' + esc(lgV) + '">' : '') + '</div>' + (btn || '<span></span>') + (extra ? '<div class="bpc-x">' + esc(extra) + '</div>' : '') + '</div>';
+    };
+    ks.forEach(function (k) {
+      var ps = dias[k].slice().sort(function (a, b) { return (a.h || '99') < (b.h || '99') ? -1 : (a.h || '99') > (b.h || '99') ? 1 : 0; });
+      var nj = ps.filter(function (e) { return e.jugado; }).length;
+      h += '<div class="bpc-dia" id="bpc-d-' + k + '">' + esc(diaLargo(k)) + (k === hoy ? ' <span class="bpc-hoy">HOY</span>' : '') + '<small>' + (nj === ps.length ? 'jugado' : nj ? nj + '/' + ps.length + ' jugados' : (k < hoy ? 'sin resultados' : 'por jugar')) + '</small></div><div class="bpc-card">' + ps.map(fila).join('') + '</div>';
+    });
+    if (sinDia.length) h += '<div class="bpc-dia">Día a confirmar<small>' + sinDia.length + ' partido' + (sinDia.length !== 1 ? 's' : '') + '</small></div><div class="bpc-card">' + sinDia.map(fila).join('') + '</div>';
+    return h;
+  }
+  function pintarCal(el) {
+    el = el || document.getElementById('ftL'); if (!el) return;
+    var barra = glob() ? '' : '<div class="bpc-top" style="margin-bottom:12px"><div class="bpc-seg"><button onclick="BPFixture.cal.vista(\'eq\')">📋 Partidos de ' + esc(miEq()) + '</button><button class="on">🗓️ Calendario de la conferencia</button></div></div>';
+    el.innerHTML = barra + '<div id="bpc-wrap" data-sin-escudo="1">' + calHtml() + '</div>';
+  }
+  function refrescarCal() { var w = document.getElementById('bpc-wrap'); if (w) w.innerHTML = calHtml(); else pintarCal(); }
+  var CALAPI = {
+    filtro: function (f) { CAL.filtro = f; refrescarCal(); },
+    equipo: function (e) { CAL.equipo = e; refrescarCal(); },
+    vista: function (v) { CAL.vista = v; try { rFt(); } catch (e) {} },
+    proximo: function () { var el = null, hoy = hoyISO(); document.querySelectorAll('[id^="bpc-d-"]').forEach(function (n) { if (!el && n.id.slice(6) >= hoy) el = n; }); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); },
+    html: calHtml, pintar: pintarCal
+  };
+  function envolverFt() {
+    var r = window.rFt; if (typeof r !== 'function' || r.__bpFx) return;
+    window.rFt = function () {
+      if (!hay()) return r.apply(this, arguments);
+      if (glob()) { pintarCal(); return; }
+      if (CAL.vista === 'cal') { pintarCal(); return; }
+      var out = r.apply(this, arguments), el = document.getElementById('ftL');
+      if (el) { inyectarCss(); var b = document.createElement('div'); b.className = 'bpc-top'; b.style.marginBottom = '12px'; b.innerHTML = '<div class="bpc-seg"><button class="on">📋 Partidos de ' + esc(miEq()) + '</button><button onclick="BPFixture.cal.vista(\'cal\')">🗓️ Calendario de la conferencia</button></div>'; el.insertBefore(b, el.firstChild); }
+      return out;
+    };
+    window.rFt.__bpFx = 1;
+  }
+
+  window.BPFixture = { cal: CALAPI, partidos: partidos, leer: leer, grupos: grupos, mismo: mismo, conFechas: conFechas, fechas: fechas, hay: hay, diaTxt: diaTxt, abrir: abrir };
 })();
 
 </script>
@@ -36402,6 +36518,7 @@ window.bpGuardia = function(){
   }
   function fixtureJornadas() {
     var el = document.getElementById('ftL'); if (!el) return;
+    if (window.BPFixture && BPFixture.hay() && BPFixture.cal) { BPFixture.cal.pintar(el); return; }
     var grupos = gruposFixture(), idx = {}; grupos.forEach(function (g) { idx[g.k] = g; });
     if (!grupos.length) { el.innerHTML = '<div class="bp-cartel"><b>Todavía no hay partidos</b><span>Cuando se carguen aparecen acá, ordenados por jornada.</span></div>'; return; }
     if (abierta && !idx[abierta]) abierta = null;
