@@ -37456,6 +37456,243 @@ window.bpGuardia = function(){
 })();
 
 </script>
+<script id="bp-dominio">
+/* BasketPro · Inicio: "Quién domina cada zona de la cancha"
+ *
+ * Cancha de 14 zonas (las mismas de todos los mapas de la app). En cada zona se muestra al líder del ranking:
+ *   · Equipos → Ataque (quién tira mejor desde ahí) o Defensa (quién deja tirar peor a los rivales)
+ *   · Jugadores → quién tira mejor desde ahí
+ * Criterio: puntos por tiro (PPS) con un mínimo de intentos, para que un 2 de 2 no gane a un 20 de 40.
+ * Fuente: solo partidos con mapa cargado (carga manual, HTML oficial o PBP con coordenadas).
+ * Aparece en las dos versiones (admin y pública) y respeta lo que se publique: si no hay mapas, no se dibuja.
+ */
+(function () {
+  'use strict';
+  if (window.BPDominio) return;
+
+  var ST = { modo: 'eq', lado: 'atk', min: 'auto', zona: null };
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  var css = document.createElement('style'); css.id = 'bp-dom-css';
+  css.textContent = [
+    '#bp-dom{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin:0 0 14px}',
+    '#bp-dom .bd-t{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:4px;font-weight:800;font-size:14px}',
+    '#bp-dom .bd-t small{font-weight:500;color:var(--text3);font-size:11px}',
+    '#bp-dom .bd-sub{font-size:11.5px;color:var(--text3);margin-bottom:10px;line-height:1.45}',
+    '#bp-dom .bd-ctl{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}',
+    '#bp-dom .bd-seg{display:inline-flex;border:1px solid var(--border2);border-radius:8px;overflow:hidden}',
+    '#bp-dom .bd-seg button{padding:6px 11px;background:transparent;border:0;color:var(--text2);font-size:12px;cursor:pointer;font-weight:600}',
+    '#bp-dom .bd-seg button.on{background:var(--green);color:#fff}',
+    '#bp-dom select{padding:6px 8px;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:12px}',
+    '#bp-dom .bd-wrap{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:16px;align-items:start}',
+    '#bp-dom .bd-cancha{max-width:520px;width:100%;margin:0 auto}',
+    '#bp-dom .bd-lista{font-size:12px}',
+    '#bp-dom .bd-fila{display:grid;grid-template-columns:20px 20px 1fr auto;gap:7px;align-items:center;padding:6px 4px;border-bottom:1px solid var(--border2)}',
+    '#bp-dom .bd-fila.yo{background:color-mix(in srgb,var(--green) 14%,transparent);border-radius:6px}',
+    '#bp-dom .bd-fila img{width:18px;height:18px;object-fit:contain}',
+    '#bp-dom .bd-nota{font-size:10px;color:var(--text3);margin-top:8px;line-height:1.5}',
+    '@media(max-width:760px){#bp-dom .bd-wrap{grid-template-columns:1fr}}'
+  ].join('\n');
+  document.head.appendChild(css);
+
+  // ── Utilidades ──
+  function logo(n) { try { return (window.BPEscudos && BPEscudos.logoDe(n)) || ''; } catch (e) { return ''; } }
+  var SIG = {};
+  function siglasUnicas(nombres) {
+    SIG = {}; var usadas = {};
+    nombres.slice().sort().forEach(function (n) {
+      var pal = String(n || '').replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ ]/g, ' ').split(/\s+/).filter(function (w) { return w.length > 2; }), p0 = (pal[0] || String(n)).toUpperCase(), c = [];
+      c.push(p0.slice(0, 3)); if (pal.length > 1) c.push(pal.slice(0, 3).map(function (w) { return w[0]; }).join('').toUpperCase());
+      c.push(p0.slice(0, 4)); c.push(p0.slice(0, 5)); c.push(String(n).toUpperCase().slice(0, 6));
+      var el = c.filter(function (x) { return x && !usadas[x]; })[0] || c[c.length - 1]; usadas[el] = 1; SIG[n] = el;
+    });
+  }
+  function sigla(n) { return SIG[n] || String(n || '?').slice(0, 3).toUpperCase(); }
+  function siglaVieja(n) { var p = String(n || '').replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ ]/g, ' ').split(/\s+/).filter(function (w) { return w.length > 2; }); return (p.length > 1 ? p.slice(0, 3).map(function (w) { return w[0]; }).join('') : (p[0] || String(n || '?')).slice(0, 3)).toUpperCase(); }
+  function tieneZonas(z) { return !!z && Object.keys(z).some(function (k) { return z[k] && (z[k].i || 0) > 0; }); }
+  function sumarZ(dst, z) { Object.keys(z || {}).forEach(function (k) { var d = z[k]; if (!d || !(d.i > 0)) return; var a = dst[k] || (dst[k] = { m: 0, i: 0 }); a.m += d.m || 0; a.i += d.i || 0; }); }
+  function mediana(v) { v = v.slice().sort(function (a, b) { return a - b; }); var n = v.length; return n ? (n % 2 ? v[(n - 1) / 2] : (v[n / 2 - 1] + v[n / 2]) / 2) : 0; }
+  function ptsZona(k) { for (var i = 0; i < ZONAS_CARGA.length; i++) if (ZONAS_CARGA[i].k === k) return ZONAS_CARGA[i].pts; return 2; }
+
+  // ── Recolección ──
+  var cacheEv = {};
+  function eventosPbp(gid) {
+    var r = (typeof pbpStore !== 'undefined' && pbpStore[gid]) ? pbpStore[gid] : null, sello = r ? (r.raw ? r.raw.length : (r.nEventos || 0)) : -1;
+    var c = cacheEv[gid]; if (c && c.s === sello) return c.ev;
+    var ev = null; try { ev = pbpEventosCrudos(gid) || null; } catch (e) {}
+    cacheEv[gid] = { s: sello, ev: ev }; return ev;
+  }
+  function recolectar() {
+    var rows = []; try { rows = getTorneoTeams() || []; } catch (e) {}
+    var canon = function (nm) { nm = String(nm || '').trim(); for (var i = 0; i < rows.length; i++) { try { if (teamNameMatch(rows[i].name, nm)) return rows[i].name; } catch (e) {} } return nm; };
+    var juegos = []; try { juegos = getTorneoGamesAll() || []; } catch (e) {}
+    var T = {}, J = {}, nMapas = 0, ligaZ = {};
+    var tEq = function (n) { return T[n] || (T[n] = { atk: {}, def: {}, n: 0 }); };
+    var addJ = function (eq, c, nombre, z) {
+      var k = eq + '|' + c, j = J[k] || (J[k] = { n: nombre, eq: eq, z: {}, pj: 0 });
+      sumarZ(j.z, z); j.pj++;
+    };
+    juegos.forEach(function (g) {
+      var A = canon(g.teamA), B = canon(g.teamB), gid = _gameId(g.fname);
+      // Equipos: lo que tiró cada uno (ataque) y lo que permitió (defensa)
+      var z = (typeof shotMapStore !== 'undefined') ? shotMapStore['_zonas_' + g.fname] : null;
+      if (z && (tieneZonas(z.local) || tieneZonas(z.visitante))) {
+        nMapas++;
+        [['local', A, 'visitante'], ['visitante', B, 'local']].forEach(function (t) {
+          var propio = z[t[0]], rival = z[t[2]];
+          if (tieneZonas(propio)) { var e = tEq(t[1]); sumarZ(e.atk, propio); e.n++; sumarZ(ligaZ, propio); }
+          if (tieneZonas(rival)) sumarZ(tEq(t[1]).def, rival);
+        });
+      }
+      // Jugadores: primero el PBP con coordenadas; si no, la carga por jugador (HTML oficial o manual)
+      var hechos = {};
+      try {
+        if (typeof pbpTieneDatos === 'function' && pbpTieneDatos(gid)) {
+          var ev = eventosPbp(gid), a = (pbpStore[gid] && pbpStore[gid].a) || {};
+          var lado = {};
+          lado.local = teamNameMatch(a.nombreLocal || '', g.teamA) ? A : (teamNameMatch(a.nombreLocal || '', g.teamB) ? B : null);
+          lado.visitante = teamNameMatch(a.nombreVisita || '', g.teamB) ? B : (teamNameMatch(a.nombreVisita || '', g.teamA) ? A : null);
+          if (ev && ev.length && lado.local && lado.visitante) {
+            var por = {};
+            ev.forEach(function (e) {
+              if (e.x == null || e.y == null || !/^(CANASTA-[23]P|TIRO[23]-FALLADO)$/.test(e.tipo || '') || !e.jugador || !lado[e.equipo]) return;
+              var k = _pbpZona14ParaTiro(e.x, e.y, /3P$|^TIRO3/.test(e.tipo)); if (!k) return;
+              var eq = lado[e.equipo], c = _mjClave(e.jugador), id = eq + '|' + c, p = por[id] || (por[id] = { eq: eq, c: c, n: e.jugador, z: {} });
+              var d = p.z[k] || (p.z[k] = { m: 0, i: 0 }); d.i++; if (/^CANASTA/.test(e.tipo)) d.m++;
+            });
+            Object.keys(por).forEach(function (id) { var p = por[id]; addJ(p.eq, p.c, p.n, p.z); hechos[id] = 1; });
+          }
+        }
+      } catch (e) {}
+      var zj = (typeof shotMapStore !== 'undefined') ? shotMapStore['_zj_' + g.fname] : null;
+      if (zj) Object.keys(zj).forEach(function (c) {
+        var e = zj[c]; if (!e || !e.z) return;
+        var eq = null, en = function (lst) { return (lst || []).some(function (p) { return _mjCoincide(_mjClave(p.N), c); }); };
+        var enA = en(g.playersA), enB = en(g.playersB);
+        if (enA && !enB) eq = A; else if (enB && !enA) eq = B; else if (enA && enB) { eq = (g.playersA || []).some(function (p) { return String(p.N || '').toUpperCase() === String(e.n || '').toUpperCase(); }) ? A : B; }
+        if (!eq || hechos[eq + '|' + c]) return;
+        addJ(eq, c, e.n, e.z);
+      });
+    });
+    return { T: T, J: J, nMapas: nMapas, nJuegos: juegos.length, ligaZ: ligaZ };
+  }
+
+  // ── Ranking de una zona ──
+  function ranking(D, zk) {
+    var pts = ptsZona(zk), lista = [];
+    if (ST.modo === 'eq') {
+      Object.keys(D.T).forEach(function (n) { var d = D.T[n][ST.lado][zk]; if (d && d.i > 0) lista.push({ nombre: n, eq: n, m: d.m, i: d.i, pj: D.T[n].n }); });
+    } else {
+      Object.keys(D.J).forEach(function (k) { var j = D.J[k], d = j.z[zk]; if (d && d.i > 0) lista.push({ nombre: j.n, eq: j.eq, m: d.m, i: d.i, pj: j.pj }); });
+    }
+    var minI = ST.min === 'auto' ? Math.max(3, Math.ceil(mediana(lista.map(function (x) { return x.i; })) * 0.5)) : +ST.min;
+    lista.forEach(function (x) { x.pct = x.m / x.i * 100; x.pps = x.m * pts / x.i; });
+    var ok = lista.filter(function (x) { return x.i >= minI; });
+    var asc = ST.modo === 'eq' && ST.lado === 'def';
+    ok.sort(function (a, b) { return (asc ? a.pps - b.pps : b.pps - a.pps) || b.i - a.i; });
+    return { lista: ok, minI: minI, total: lista.length };
+  }
+
+  // ── Dibujo ──
+  function cancha(D) {
+    var cid = 'bdclip' + Math.random().toString(36).slice(2, 7), paths = '', etiq = '', esquinas = {}, W = CTH_W, H = CTH_H;
+    ZONAS_CARGA.forEach(function (Z) {
+      var R = ranking(D, Z.k), L = R.lista[0], sel = ST.zona === Z.k;
+      var fill = L ? '#6fbf82' : '#d8d4c8', op = 0.3;
+      if (L) { var lz = D.ligaZ[Z.k], pl = lz && lz.i >= 10 ? lz.m * Z.pts / lz.i : 0, rat = pl ? (ST.modo === 'eq' && ST.lado === 'def' ? pl / Math.max(L.pps, 0.05) : L.pps / pl) : 1.2; op = Math.max(0.3, Math.min(0.95, 0.3 + (rat - 1) * 1.3)); }
+      if (Z.k === 'esq_sup' || Z.k === 'esq_inf') esquinas[Z.k] = { fill: fill, op: op, sel: sel };
+      var click = 'onclick="BPDominio.zona(\'' + Z.k + '\')" style="cursor:pointer"';
+      paths += '<g ' + click + '><path d="' + _cthSector(Z.r1, Z.r2, Z.a1, Z.a2, false) + '" fill="' + fill + '" fill-opacity="' + op + '" stroke="' + (sel ? '#6a4c93' : '#9b9b9b') + '" stroke-width="' + (sel ? 2.6 : 0.8) + '" clip-path="url(#' + cid + ')"/></g>';
+      var aMid = (Z.a1 + Z.a2) / 2, rMid = Z.k === 'aro' ? CTH_R_ARO * 0.55 : (Z.pts === 3 ? Z.r1 + 12 : (Z.r1 + Z.r2) / 2);
+      var cx = CTH_ARO_X + rMid * Math.cos(aMid * Math.PI / 180), cy = CTH_ARO_Y - rMid * Math.sin(aMid * Math.PI / 180);
+      if (!L) return;
+      var lg = ST.modo === 'eq' ? logo(L.eq) : '', et;
+      var nom = ST.modo === 'eq' ? sigla(L.nombre) : String(L.nombre || '').split(',')[0].slice(0, 7);
+      et = '<g ' + click + '>';
+      if (lg) et += '<image href="' + esc(lg) + '" x="' + (cx - 9).toFixed(1) + '" y="' + (cy - 19).toFixed(1) + '" width="18" height="18" preserveAspectRatio="xMidYMid meet"/>';
+      else et += '<text x="' + cx.toFixed(1) + '" y="' + (cy - 7).toFixed(1) + '" text-anchor="middle" font-size="' + (ST.modo === 'eq' ? 11 : 7.5) + '" font-weight="800" fill="#1a1a2e" paint-order="stroke" stroke="#faf7f0" stroke-width="2.5">' + esc(nom) + '</text>';
+      et += '<text x="' + cx.toFixed(1) + '" y="' + (cy + (lg ? 8 : 4)).toFixed(1) + '" text-anchor="middle" font-size="9.5" font-weight="700" fill="#1a1a2e" paint-order="stroke" stroke="#faf7f0" stroke-width="2.5">' + Math.round(L.pct) + '%</text>'
+        + '<text x="' + cx.toFixed(1) + '" y="' + (cy + (lg ? 17 : 13)).toFixed(1) + '" text-anchor="middle" font-size="7.5" fill="#444" paint-order="stroke" stroke="#faf7f0" stroke-width="2">' + L.m + '/' + L.i + '</text></g>';
+      etiq += et;
+    });
+    var yc = 6.6 * CTH_PXM, x0 = CTH_ARO_X - 0.4, cor = '';
+    if (esquinas.esq_sup) cor += '<rect x="' + x0.toFixed(1) + '" y="1" width="' + (W - x0 - 1).toFixed(1) + '" height="' + (H / 2 - yc - 1).toFixed(1) + '" fill="' + esquinas.esq_sup.fill + '" fill-opacity="' + esquinas.esq_sup.op + '" onclick="BPDominio.zona(\'esq_sup\')" style="cursor:pointer"/>';
+    if (esquinas.esq_inf) cor += '<rect x="' + x0.toFixed(1) + '" y="' + (H / 2 + yc).toFixed(1) + '" width="' + (W - x0 - 1).toFixed(1) + '" height="' + (H / 2 - yc - 1).toFixed(1) + '" fill="' + esquinas.esq_inf.fill + '" fill-opacity="' + esquinas.esq_inf.op + '" onclick="BPDominio.zona(\'esq_inf\')" style="cursor:pointer"/>';
+    return '<svg viewBox="-14 -14 ' + (W + 28) + ' ' + (H + 28) + '" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;background:#faf7f0;border-radius:8px;display:block">'
+      + '<defs><clipPath id="' + cid + '"><rect x="1" y="1" width="' + (W - 2) + '" height="' + (H - 2) + '"/></clipPath></defs>'
+      + paths + cor + _cthOcultarDetrasAro(false) + _cthLineasCancha(false) + etiq + '</svg>';
+  }
+
+  function lista(D) {
+    if (!ST.zona) return '<div class="bd-lista" style="color:var(--text3);padding:14px 4px;line-height:1.6">👆 Tocá una zona de la cancha para ver el ranking completo.<br>En cada zona se muestra al <b>líder</b>: su escudo (o iniciales), el % de acierto y los convertidos/intentados.</div>';
+    var Z = ZONAS_CARGA.filter(function (z) { return z.k === ST.zona; })[0], R = ranking(D, ST.zona), yo = '';
+    try { if (!(typeof esVistaGlobal === 'function' && esVistaGlobal())) yo = activeTeamName(); } catch (e) {}
+    var es = function (x) { try { return yo && teamNameMatch(x.eq, yo); } catch (e) { return false; } };
+    var top = R.lista.slice(0, 8);
+    var miPos = -1; if (yo && ST.modo === 'eq') for (var i = 0; i < R.lista.length; i++) if (es(R.lista[i])) { miPos = i; break; }
+    var fila = function (x, i) {
+      var lg = logo(x.eq);
+      return '<div class="bd-fila' + (es(x) ? ' yo' : '') + '"><b style="color:var(--text3)">' + (i + 1) + '</b>' + (lg ? '<img alt="" src="' + esc(lg) + '">' : '<span></span>')
+        + '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><b>' + esc(x.nombre) + '</b>' + (ST.modo === 'jug' ? '<span style="color:var(--text3)"> · ' + esc(x.eq) + '</span>' : '') + '</span>'
+        + '<span style="text-align:right"><b>' + x.pps.toFixed(2) + '</b> <span style="color:var(--text3);font-size:10px">pts/tiro</span><br><span style="color:var(--text3);font-size:10.5px">' + Math.round(x.pct) + '% · ' + x.m + '/' + x.i + '</span></span></div>';
+    };
+    var tit = (ST.modo === 'eq' ? (ST.lado === 'atk' ? 'Mejores atacando desde ' : 'Mejores defendiendo ') : 'Mejores tiradores desde ') + '<b>' + esc(Z.label) + '</b> (' + Z.pts + ' pts)';
+    var h = '<div class="bd-lista"><div style="margin-bottom:6px">' + tit + '</div>';
+    if (!R.lista.length) h += '<div style="color:var(--text3);padding:8px 2px">Nadie llega al mínimo de ' + R.minI + ' intentos en esta zona' + (R.total ? ' (' + R.total + ' con menos)' : '') + '. Probá bajar el mínimo.</div>';
+    else {
+      h += top.map(fila).join('');
+      if (miPos >= 8) h += '<div style="text-align:center;color:var(--text3);font-size:11px;padding:3px">⋯</div>' + fila(R.lista[miPos], miPos);
+      else if (yo && ST.modo === 'eq' && miPos < 0) h += '<div style="color:var(--text3);font-size:11px;padding:6px 2px">Tu equipo no llega al mínimo de intentos en esta zona.</div>';
+    }
+    return h + '<div class="bd-nota">' + (ST.modo === 'eq' && ST.lado === 'def' ? 'Defensa: puntos por tiro que permite (menos es mejor). ' : 'Ordenado por puntos por tiro. ') + 'Mínimo: ' + R.minI + ' intentos.</div></div>';
+  }
+
+  function pintar() {
+    var v = $('v-home'); if (!v) return;
+    var prev = $('bp-dom'); if (prev) prev.remove();
+    var D; try { D = recolectar(); } catch (e) { try { console.warn('bp_dominio', e); } catch (_) {} return; }
+    siglasUnicas(Object.keys(D.T));
+    var hayEq = D.nMapas > 0, hayJ = Object.keys(D.J).length > 0;
+    if (!hayEq && !hayJ) return;
+    if (ST.modo === 'eq' && !hayEq) ST.modo = 'jug';
+    if (ST.modo === 'jug' && !hayJ) ST.modo = 'eq';
+    if (ST.modo === 'jug') ST.lado = 'atk';
+    var nEq = Object.keys(D.T).filter(function (n) { return D.T[n].n > 0; }).length;
+    var card = document.createElement('div'); card.id = 'bp-dom';
+    var seg = function (items, cur, fn) { return '<div class="bd-seg">' + items.map(function (it) { return '<button class="' + (it[0] === cur ? 'on' : '') + '" onclick="BPDominio.' + fn + '(\'' + it[0] + '\')">' + it[1] + '</button>'; }).join('') + '</div>'; };
+    var ctl = '<div class="bd-ctl">'
+      + (hayEq && hayJ ? seg([['eq', '🏀 Equipos'], ['jug', '👤 Jugadores']], ST.modo, 'modo') : '')
+      + (ST.modo === 'eq' ? seg([['atk', '⚔️ Ataque'], ['def', '🛡️ Defensa']], ST.lado, 'lado') : '')
+      + '<label style="font-size:11.5px;color:var(--text3)">Mín. intentos <select onchange="BPDominio.min(this.value)">'
+      + [['auto', 'Automático'], ['3', '3'], ['5', '5'], ['10', '10'], ['20', '20'], ['40', '40']].map(function (o) { return '<option value="' + o[0] + '"' + (String(ST.min) === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></label></div>';
+    var base = D.nMapas + ' de ' + D.nJuegos + ' partido' + (D.nJuegos !== 1 ? 's' : '') + ' con mapa cargado' + (ST.modo === 'eq' ? ' · ' + nEq + ' equipo' + (nEq !== 1 ? 's' : '') : '');
+    var aviso = D.nMapas < 3 ? '<div class="bd-nota" style="color:#c8860a;margin:0 0 8px">⚠️ Hay pocos partidos con mapa: el ranking puede cambiar mucho al cargar más.</div>' : '';
+    card.innerHTML = '<div class="bd-t"><span>🗺️ Quién domina cada zona</span><small>' + base + '</small></div>'
+      + '<div class="bd-sub">' + (ST.modo === 'jug' ? 'El mejor tirador de la liga desde cada zona (puntos por tiro, con mínimo de intentos).'
+        : (ST.lado === 'atk' ? 'El equipo que mejor tira desde cada zona.' : 'El equipo que deja a sus rivales tirar peor desde cada zona.')) + '</div>'
+      + ctl + aviso
+      + '<div class="bd-nota" style="margin:0 0 8px">Color más intenso = el líder supera más al promedio de la liga en esa zona.</div>'
+      + '<div class="bd-wrap"><div class="bd-cancha">' + cancha(D) + '</div><div>' + lista(D) + '</div></div>';
+    var ini = $('bp-ini'); (ini || v).appendChild(card);
+  }
+
+  window.BPDominio = {
+    pintar: pintar,
+    modo: function (m) { ST.modo = m; ST.zona = null; pintar(); },
+    lado: function (l) { ST.lado = l; pintar(); },
+    min: function (m) { ST.min = m; pintar(); },
+    zona: function (k) { ST.zona = (ST.zona === k ? null : k); pintar(); }
+  };
+
+  function envolver() {
+    var o = window.rHome; if (typeof o !== 'function' || o.__bpDom) return false;
+    var w = function () { var r = o.apply(this, arguments); try { pintar(); } catch (e) { try { console.warn('bp_dominio', e); } catch (_) {} } return r; };
+    w.__bpDom = 1; window.rHome = w; return true;
+  }
+  envolver();
+})();
+
+</script>
  box deducido</div>
 </body>
 </html>
