@@ -37611,6 +37611,7 @@ window.bpGuardia = function(){
       et = '<g ' + click + '>';
       if (lg) et += '<image href="' + esc(lg) + '" x="' + (cx - 9).toFixed(1) + '" y="' + (cy - 19).toFixed(1) + '" width="18" height="18" preserveAspectRatio="xMidYMid meet"/>';
       else et += '<text x="' + cx.toFixed(1) + '" y="' + (cy - 7).toFixed(1) + '" text-anchor="middle" font-size="' + (ST.modo === 'eq' ? 11 : 7.5) + '" font-weight="800" fill="#1a1a2e" paint-order="stroke" stroke="#faf7f0" stroke-width="2.5">' + esc(nom) + '</text>';
+      if (ST.modo === 'jug') et += '<text x="' + cx.toFixed(1) + '" y="' + (cy - 15).toFixed(1) + '" text-anchor="middle" font-size="6.5" font-weight="700" fill="#6a4c93" paint-order="stroke" stroke="#faf7f0" stroke-width="2">' + esc(sigla(L.eq)) + '</text>';
       et += '<text x="' + cx.toFixed(1) + '" y="' + (cy + (lg ? 8 : 4)).toFixed(1) + '" text-anchor="middle" font-size="9.5" font-weight="700" fill="#1a1a2e" paint-order="stroke" stroke="#faf7f0" stroke-width="2.5">' + Math.round(L.pct) + '%</text>'
         + '<text x="' + cx.toFixed(1) + '" y="' + (cy + (lg ? 17 : 13)).toFixed(1) + '" text-anchor="middle" font-size="7.5" fill="#444" paint-order="stroke" stroke="#faf7f0" stroke-width="2">' + L.m + '/' + L.i + '</text></g>';
       etiq += et;
@@ -37633,7 +37634,7 @@ window.bpGuardia = function(){
     var fila = function (x, i) {
       var lg = logo(x.eq);
       return '<div class="bd-fila' + (es(x) ? ' yo' : '') + '"><b style="color:var(--text3)">' + (i + 1) + '</b>' + (lg ? '<img alt="" src="' + esc(lg) + '">' : '<span></span>')
-        + '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><b>' + esc(x.nombre) + '</b>' + (ST.modo === 'jug' ? '<span style="color:var(--text3)"> · ' + esc(x.eq) + '</span>' : '') + '</span>'
+        + '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><b>' + esc(x.nombre) + '</b>' + (ST.modo === 'jug' ? '<br><span style="color:var(--text2,#666);font-weight:500;font-size:11px">' + esc(x.eq) + '</span>' : '') + '</span>'
         + '<span style="text-align:right"><b>' + x.pps.toFixed(2) + '</b> <span style="color:var(--text3);font-size:10px">pts/tiro</span><br><span style="color:var(--text3);font-size:10.5px">' + Math.round(x.pct) + '% · ' + x.m + '/' + x.i + '</span></span></div>';
     };
     var tit = (ST.modo === 'eq' ? (ST.lado === 'atk' ? 'Mejores atacando desde ' : 'Mejores defendiendo ') : 'Mejores tiradores desde ') + '<b>' + esc(Z.label) + '</b> (' + Z.pts + ' pts)';
