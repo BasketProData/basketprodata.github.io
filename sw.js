@@ -1,6 +1,6 @@
 /* Guarda la app en el dispositivo para que abra sin señal. Los DATOS se guardan aparte (en index.html).
    Estrategia: primero la red (así las mejoras llegan solas) y, si no hay señal, la copia guardada. */
-var V = 'bpl-v32';
+var V = 'bpl-v35';
 var BASE = ['./', 'index.html', 'completa.html', 'manifest.webmanifest', 'icon.svg', 'icon-180.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png'];
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(V).then(function (c) { return c.addAll(BASE); }).then(function () { return self.skipWaiting(); }));

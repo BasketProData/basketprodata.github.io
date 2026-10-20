@@ -37470,7 +37470,10 @@ window.bpGuardia = function(){
   'use strict';
   if (window.BPDominio) return;
 
-  var ST = { modo: 'eq', lado: 'atk', min: 'auto', zona: null };
+  var ST = { modo: 'eq', lado: 'atk', min: 'auto', zona: null, ambito: 'equipo' };
+  function miEquipo() { var yo = ''; try { if (!(typeof esVistaGlobal === 'function' && esVistaGlobal())) yo = activeTeamName() || ''; } catch (e) {} return yo; }
+  function enEquipo() { return !!miEquipo() && ST.ambito === 'equipo'; }
+  function esMio(n) { try { var yo = miEquipo(); return !!yo && teamNameMatch(n, yo); } catch (e) { return false; } }
   var $ = function (id) { return document.getElementById(id); };
   var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
   var css = document.createElement('style'); css.id = 'bp-dom-css';
@@ -37496,7 +37499,19 @@ window.bpGuardia = function(){
   document.head.appendChild(css);
 
   // ── Utilidades ──
-  function logo(n) { try { return (window.BPEscudos && BPEscudos.logoDe(n)) || ''; } catch (e) { return ''; } }
+  var cacheLogo = {};
+  function logo(n) {
+    var r = '';
+    try { r = (window.BPEscudos && BPEscudos.logoDe(n)) || ''; } catch (e) {}
+    if (r) return r;
+    try {
+      var L = (typeof cfgData !== 'undefined' && cfgData && cfgData.teamLogos) || {}, ks = Object.keys(L), f = n + '|' + ks.length;
+      if (cacheLogo[f] !== undefined) return cacheLogo[f];
+      for (var i = 0; i < ks.length && !r; i++) { if (L[ks[i]] && teamNameMatch(ks[i], n)) r = L[ks[i]]; }
+      cacheLogo[f] = r;
+    } catch (e) {}
+    return r;
+  }
   var SIG = {};
   function siglasUnicas(nombres) {
     SIG = {}; var usadas = {};
@@ -37583,35 +37598,45 @@ window.bpGuardia = function(){
     if (ST.modo === 'eq') {
       Object.keys(D.T).forEach(function (n) { var d = D.T[n][ST.lado][zk]; if (d && d.i > 0) lista.push({ nombre: n, eq: n, m: d.m, i: d.i, pj: D.T[n].n }); });
     } else {
-      Object.keys(D.J).forEach(function (k) { var j = D.J[k], d = j.z[zk]; if (d && d.i > 0) lista.push({ nombre: j.n, eq: j.eq, m: d.m, i: d.i, pj: j.pj }); });
+      var solo = enEquipo();
+      Object.keys(D.J).forEach(function (k) { var j = D.J[k], d = j.z[zk]; if (d && d.i > 0 && (!solo || esMio(j.eq))) lista.push({ nombre: j.n, eq: j.eq, m: d.m, i: d.i, pj: j.pj }); });
     }
-    var minI = ST.min === 'auto' ? Math.max(3, Math.ceil(mediana(lista.map(function (x) { return x.i; })) * 0.5)) : +ST.min;
+    var minI = ST.min === 'auto' ? Math.max(enEquipo() && ST.modo === 'jug' ? 2 : 3, Math.ceil(mediana(lista.map(function (x) { return x.i; })) * 0.5)) : +ST.min;
     lista.forEach(function (x) { x.pct = x.m / x.i * 100; x.pps = x.m * pts / x.i; });
     var ok = lista.filter(function (x) { return x.i >= minI; });
     var asc = ST.modo === 'eq' && ST.lado === 'def';
     ok.sort(function (a, b) { return (asc ? a.pps - b.pps : b.pps - a.pps) || b.i - a.i; });
-    return { lista: ok, minI: minI, total: lista.length };
+    var mio = null, pos = -1;
+    if (ST.modo === 'eq') { for (var q = 0; q < lista.length; q++) if (esMio(lista[q].eq)) { mio = lista[q]; break; } if (mio) pos = ok.indexOf(mio); }
+    return { lista: ok, minI: minI, total: lista.length, mio: mio, pos: pos };
   }
 
   // ── Dibujo ──
   function cancha(D) {
     var cid = 'bdclip' + Math.random().toString(36).slice(2, 7), paths = '', etiq = '', esquinas = {}, W = CTH_W, H = CTH_H;
     ZONAS_CARGA.forEach(function (Z) {
-      var R = ranking(D, Z.k), L = R.lista[0], sel = ST.zona === Z.k;
+      var R = ranking(D, Z.k), mioEq = enEquipo() && ST.modo === 'eq', L = mioEq ? R.mio : R.lista[0], sel = ST.zona === Z.k;
       var fill = L ? '#6fbf82' : '#d8d4c8', op = 0.3;
-      if (L) { var lz = D.ligaZ[Z.k], pl = lz && lz.i >= 10 ? lz.m * Z.pts / lz.i : 0, rat = pl ? (ST.modo === 'eq' && ST.lado === 'def' ? pl / Math.max(L.pps, 0.05) : L.pps / pl) : 1.2; op = Math.max(0.3, Math.min(0.95, 0.3 + (rat - 1) * 1.3)); }
+      if (L) {
+        var lz = D.ligaZ[Z.k], pl = lz && lz.i >= 10 ? lz.m * Z.pts / lz.i : 0, rat = pl ? (ST.modo === 'eq' && ST.lado === 'def' ? pl / Math.max(L.pps, 0.05) : L.pps / pl) : 1.2;
+        if (mioEq && rat < 1) { fill = '#e08a6a'; op = Math.max(0.3, Math.min(0.9, 0.3 + (1 - rat) * 1.6)); }
+        else op = Math.max(0.3, Math.min(0.95, 0.3 + (rat - 1) * 1.3));
+      }
       if (Z.k === 'esq_sup' || Z.k === 'esq_inf') esquinas[Z.k] = { fill: fill, op: op, sel: sel };
       var click = 'onclick="BPDominio.zona(\'' + Z.k + '\')" style="cursor:pointer"';
       paths += '<g ' + click + '><path d="' + _cthSector(Z.r1, Z.r2, Z.a1, Z.a2, false) + '" fill="' + fill + '" fill-opacity="' + op + '" stroke="' + (sel ? '#6a4c93' : '#9b9b9b') + '" stroke-width="' + (sel ? 2.6 : 0.8) + '" clip-path="url(#' + cid + ')"/></g>';
       var aMid = (Z.a1 + Z.a2) / 2, rMid = Z.k === 'aro' ? CTH_R_ARO * 0.55 : (Z.pts === 3 ? Z.r1 + 12 : (Z.r1 + Z.r2) / 2);
       var cx = CTH_ARO_X + rMid * Math.cos(aMid * Math.PI / 180), cy = CTH_ARO_Y - rMid * Math.sin(aMid * Math.PI / 180);
       if (!L) return;
-      var lg = ST.modo === 'eq' ? logo(L.eq) : '', et;
-      var nom = ST.modo === 'eq' ? sigla(L.nombre) : String(L.nombre || '').split(',')[0].slice(0, 7);
+      var lg = ST.modo === 'eq' && !mioEq ? logo(L.eq) : '', et;
+      var nom = mioEq ? (R.pos >= 0 ? '#' + (R.pos + 1) : '–') : (ST.modo === 'eq' ? sigla(L.nombre) : String(L.nombre || '').split(',')[0].trim());
       et = '<g ' + click + '>';
       if (lg) et += '<image href="' + esc(lg) + '" x="' + (cx - 9).toFixed(1) + '" y="' + (cy - 19).toFixed(1) + '" width="18" height="18" preserveAspectRatio="xMidYMid meet"/>';
-      else et += '<text x="' + cx.toFixed(1) + '" y="' + (cy - 7).toFixed(1) + '" text-anchor="middle" font-size="' + (ST.modo === 'eq' ? 11 : 7.5) + '" font-weight="800" fill="#1a1a2e" paint-order="stroke" stroke="#faf7f0" stroke-width="2.5">' + esc(nom) + '</text>';
-      if (ST.modo === 'jug') et += '<text x="' + cx.toFixed(1) + '" y="' + (cy - 15).toFixed(1) + '" text-anchor="middle" font-size="6.5" font-weight="700" fill="#6a4c93" paint-order="stroke" stroke="#faf7f0" stroke-width="2">' + esc(sigla(L.eq)) + '</text>';
+      else {
+        var cerca = Z.k === 'aro' || /^cerca/.test(Z.k), fs = ST.modo === 'eq' ? 11 : (cerca ? 7.2 : 8), maxW = Z.k === 'aro' ? 33 : (/^cerca/.test(Z.k) ? 42 : (/^med/.test(Z.k) ? 52 : 66)), est = String(nom).length * fs * 0.74;
+        et += '<text x="' + cx.toFixed(1) + '" y="' + (cy - 7).toFixed(1) + '"' + (ST.modo === 'jug' && est > maxW ? ' textLength="' + maxW + '" lengthAdjust="spacingAndGlyphs"' : '') + ' text-anchor="middle" font-size="' + fs + '" font-weight="800" fill="#1a1a2e" paint-order="stroke" stroke="#faf7f0" stroke-width="2.5">' + esc(nom) + '</text>';
+      }
+      if (ST.modo === 'jug' && !enEquipo()) { var lj = logo(L.eq); et += lj ? '<image href="' + esc(lj) + '" x="' + (cx - 7).toFixed(1) + '" y="' + (cy - 30).toFixed(1) + '" width="14" height="14" preserveAspectRatio="xMidYMid meet"/>' : '<text x="' + cx.toFixed(1) + '" y="' + (cy - 18).toFixed(1) + '" text-anchor="middle" font-size="6.5" font-weight="700" fill="#6a4c93" paint-order="stroke" stroke="#faf7f0" stroke-width="2">' + esc(sigla(L.eq)) + '</text>'; }
       et += '<text x="' + cx.toFixed(1) + '" y="' + (cy + (lg ? 8 : 4)).toFixed(1) + '" text-anchor="middle" font-size="9.5" font-weight="700" fill="#1a1a2e" paint-order="stroke" stroke="#faf7f0" stroke-width="2.5">' + Math.round(L.pct) + '%</text>'
         + '<text x="' + cx.toFixed(1) + '" y="' + (cy + (lg ? 17 : 13)).toFixed(1) + '" text-anchor="middle" font-size="7.5" fill="#444" paint-order="stroke" stroke="#faf7f0" stroke-width="2">' + L.m + '/' + L.i + '</text></g>';
       etiq += et;
@@ -37626,19 +37651,19 @@ window.bpGuardia = function(){
 
   function lista(D) {
     if (!ST.zona) return '<div class="bd-lista" style="color:var(--text3);padding:14px 4px;line-height:1.6">👆 Tocá una zona de la cancha para ver el ranking completo.<br>En cada zona se muestra al <b>líder</b>: su escudo (o iniciales), el % de acierto y los convertidos/intentados.</div>';
-    var Z = ZONAS_CARGA.filter(function (z) { return z.k === ST.zona; })[0], R = ranking(D, ST.zona), yo = '';
-    try { if (!(typeof esVistaGlobal === 'function' && esVistaGlobal())) yo = activeTeamName(); } catch (e) {}
+    var Z = ZONAS_CARGA.filter(function (z) { return z.k === ST.zona; })[0], R = ranking(D, ST.zona), yo = miEquipo();
     var es = function (x) { try { return yo && teamNameMatch(x.eq, yo); } catch (e) { return false; } };
     var top = R.lista.slice(0, 8);
     var miPos = -1; if (yo && ST.modo === 'eq') for (var i = 0; i < R.lista.length; i++) if (es(R.lista[i])) { miPos = i; break; }
     var fila = function (x, i) {
       var lg = logo(x.eq);
-      return '<div class="bd-fila' + (es(x) ? ' yo' : '') + '"><b style="color:var(--text3)">' + (i + 1) + '</b>' + (lg ? '<img alt="" src="' + esc(lg) + '">' : '<span></span>')
-        + '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><b>' + esc(x.nombre) + '</b>' + (ST.modo === 'jug' ? '<br><span style="color:var(--text2,#666);font-weight:500;font-size:11px">' + esc(x.eq) + '</span>' : '') + '</span>'
+      return '<div class="bd-fila' + (es(x) ? ' yo' : '') + '"><b style="color:var(--text3)">' + (i + 1) + '</b>' + (lg && !(ST.modo === 'jug' && enEquipo()) ? '<img alt="" src="' + esc(lg) + '">' : '<span></span>')
+        + '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><b>' + esc(x.nombre) + '</b>' + (ST.modo === 'jug' && !enEquipo() ? '<br><span style="color:var(--text2,#666);font-weight:500;font-size:11px">' + esc(x.eq) + '</span>' : '') + '</span>'
         + '<span style="text-align:right"><b>' + x.pps.toFixed(2) + '</b> <span style="color:var(--text3);font-size:10px">pts/tiro</span><br><span style="color:var(--text3);font-size:10.5px">' + Math.round(x.pct) + '% · ' + x.m + '/' + x.i + '</span></span></div>';
     };
-    var tit = (ST.modo === 'eq' ? (ST.lado === 'atk' ? 'Mejores atacando desde ' : 'Mejores defendiendo ') : 'Mejores tiradores desde ') + '<b>' + esc(Z.label) + '</b> (' + Z.pts + ' pts)';
+    var tit = (ST.modo === 'eq' ? (ST.lado === 'atk' ? 'Mejores atacando desde ' : 'Mejores defendiendo ') : (enEquipo() ? 'Tiradores de ' + esc(yo) + ' desde ' : 'Mejores tiradores desde ')) + '<b>' + esc(Z.label) + '</b> (' + Z.pts + ' pts)';
     var h = '<div class="bd-lista"><div style="margin-bottom:6px">' + tit + '</div>';
+    if (ST.modo === 'eq' && enEquipo() && R.mio) h += '<div style="background:var(--bg2,#f1eee6);border-radius:8px;padding:6px 8px;margin-bottom:6px;font-size:12px"><b>' + esc(yo) + '</b>: ' + Math.round(R.mio.pct) + '% · ' + R.mio.m + '/' + R.mio.i + ' · ' + R.mio.pps.toFixed(2) + ' pts/tiro · ' + (R.pos >= 0 ? 'puesto ' + (R.pos + 1) + ' de ' + R.lista.length : 'no llega al mínimo de intentos') + '</div>';
     if (!R.lista.length) h += '<div style="color:var(--text3);padding:8px 2px">Nadie llega al mínimo de ' + R.minI + ' intentos en esta zona' + (R.total ? ' (' + R.total + ' con menos)' : '') + '. Probá bajar el mínimo.</div>';
     else {
       h += top.map(fila).join('');
@@ -37659,9 +37684,11 @@ window.bpGuardia = function(){
     if (ST.modo === 'jug' && !hayJ) ST.modo = 'eq';
     if (ST.modo === 'jug') ST.lado = 'atk';
     var nEq = Object.keys(D.T).filter(function (n) { return D.T[n].n > 0; }).length;
-    var card = document.createElement('div'); card.id = 'bp-dom';
+    var card = document.createElement('div'); card.id = 'bp-dom'; card.setAttribute('data-sin-escudo', '1');
     var seg = function (items, cur, fn) { return '<div class="bd-seg">' + items.map(function (it) { return '<button class="' + (it[0] === cur ? 'on' : '') + '" onclick="BPDominio.' + fn + '(\'' + it[0] + '\')">' + it[1] + '</button>'; }).join('') + '</div>'; };
+    var yoN = miEquipo();
     var ctl = '<div class="bd-ctl">'
+      + (yoN ? seg([['equipo', '🏠 ' + yoN], ['liga', '🌐 Liga']], ST.ambito, 'ambito') : '')
       + (hayEq && hayJ ? seg([['eq', '🏀 Equipos'], ['jug', '👤 Jugadores']], ST.modo, 'modo') : '')
       + (ST.modo === 'eq' ? seg([['atk', '⚔️ Ataque'], ['def', '🛡️ Defensa']], ST.lado, 'lado') : '')
       + '<label style="font-size:11.5px;color:var(--text3)">Mín. intentos <select onchange="BPDominio.min(this.value)">'
@@ -37669,10 +37696,13 @@ window.bpGuardia = function(){
     var base = D.nMapas + ' de ' + D.nJuegos + ' partido' + (D.nJuegos !== 1 ? 's' : '') + ' con mapa cargado' + (ST.modo === 'eq' ? ' · ' + nEq + ' equipo' + (nEq !== 1 ? 's' : '') : '');
     var aviso = D.nMapas < 3 ? '<div class="bd-nota" style="color:#c8860a;margin:0 0 8px">⚠️ Hay pocos partidos con mapa: el ranking puede cambiar mucho al cargar más.</div>' : '';
     card.innerHTML = '<div class="bd-t"><span>🗺️ Quién domina cada zona</span><small>' + base + '</small></div>'
-      + '<div class="bd-sub">' + (ST.modo === 'jug' ? 'El mejor tirador de la liga desde cada zona (puntos por tiro, con mínimo de intentos).'
-        : (ST.lado === 'atk' ? 'El equipo que mejor tira desde cada zona.' : 'El equipo que deja a sus rivales tirar peor desde cada zona.')) + '</div>'
+      + '<div class="bd-sub">' + (enEquipo()
+        ? (ST.modo === 'jug' ? 'Quién domina cada zona dentro de ' + esc(yoN) + ' (puntos por tiro, con mínimo de intentos).'
+          : (ST.lado === 'atk' ? 'Cómo tira ' + esc(yoN) + ' desde cada zona y su puesto en la liga (#).' : 'Cuánto permite ' + esc(yoN) + ' desde cada zona y su puesto en la liga (#).'))
+        : (ST.modo === 'jug' ? 'El mejor tirador de la liga desde cada zona (puntos por tiro, con mínimo de intentos).'
+          : (ST.lado === 'atk' ? 'El equipo que mejor tira desde cada zona.' : 'El equipo que deja a sus rivales tirar peor desde cada zona.'))) + '</div>'
       + ctl + aviso
-      + '<div class="bd-nota" style="margin:0 0 8px">Color más intenso = el líder supera más al promedio de la liga en esa zona.</div>'
+      + '<div class="bd-nota" style="margin:0 0 8px">' + (enEquipo() && ST.modo === 'eq' ? 'Verde = ' + esc(yoN) + ' rinde por encima del promedio de la liga en esa zona; naranja = por debajo. #N = su puesto entre los equipos.' : 'Color más intenso = el líder supera más al promedio de la liga en esa zona.') + '</div>'
       + '<div class="bd-wrap"><div class="bd-cancha">' + cancha(D) + '</div><div>' + lista(D) + '</div></div>';
     var ini = $('bp-ini'); (ini || v).appendChild(card);
   }
@@ -37682,6 +37712,7 @@ window.bpGuardia = function(){
     modo: function (m) { ST.modo = m; ST.zona = null; pintar(); },
     lado: function (l) { ST.lado = l; pintar(); },
     min: function (m) { ST.min = m; pintar(); },
+    ambito: function (a) { ST.ambito = a; ST.zona = null; pintar(); },
     zona: function (k) { ST.zona = (ST.zona === k ? null : k); pintar(); }
   };
 
