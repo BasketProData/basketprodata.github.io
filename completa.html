@@ -35298,10 +35298,13 @@ window.bpGuardia = function(){
   var BLOQ = ["abrirCargaPartido", "borrarPartidosPBP", "diagnosticarPlantilla", "editarDatosDeFixture", "limpiarOrdenManual", "moverEnTabla", "abrirModalPlayByPlay", "_mjEditar", "openEtapaForm", "openNotaByFname", "openQByFname", "openVideoByFname", "openAccOrUpload", "showGestionModal", "exportBackup", "triggerImportBackup", "importBackupFile"], OCULTAS = ["cfg", "hist"];
   BLOQ.forEach(function(n){ window[n] = function(){ return false; }; });
   var swOrig = window.sw;
+  var iaOrig = window._infSetAudiencia; if (typeof iaOrig === 'function') window._infSetAudiencia = function(a){ if (a === 'periodista') a = null; return iaOrig.call(this, a); };
   window.sw = function(p){ if (OCULTAS.indexOf(p) >= 0) p = 'home'; return swOrig.apply(this, arguments.length ? [p].concat([].slice.call(arguments,1)) : [p]); };
   var rx = new RegExp('^\\s*(' + BLOQ.join('|') + ')\\s*\\(');
   function limpiar(raiz){
     (raiz || document).querySelectorAll('[onclick]').forEach(function(e){ if (rx.test(e.getAttribute('onclick') || '')) e.classList.add('bp-oculto'); });
+    // el informe para periodista no va en la app pública
+    (raiz || document).querySelectorAll('[onclick*="periodista"]').forEach(function(e){ e.classList.add('bp-oculto'); });
     // textos de ayuda que hablan de editar
     (raiz || document).querySelectorAll('div,p,span').forEach(function(e){ if (e.children.length === 0 && /^\s*Las flechas\b/.test(e.textContent || '')) e.classList.add('bp-oculto'); });
     // controles de carga de archivos
@@ -35309,15 +35312,21 @@ window.bpGuardia = function(){
   // ── Ajuste a pantalla de celular: nada cortado ──
   var ajustando = false, tAj = null;
   function esMovil(){ return window.innerWidth <= 820; }
+  var ultScroll = 0, anchoPrev = window.innerWidth;
+  window.addEventListener('scroll', function(){ ultScroll = Date.now(); }, { passive: true });
   function ajustar(){
-    if (ajustando) return; ajustando = true;
+    if (ajustando) return;
+    // si la persona está deslizando, se espera: reacomodar la página en pleno gesto la hace saltar
+    if (Date.now() - ultScroll < 450) { programar(); return; }
+    ajustando = true;
+    var yAntes = window.pageYOffset || 0;
     try {
       var cont = document.querySelector('.content'); if (!cont) return;
       var panel = cont.querySelector('.panel.active') || cont;
       // 1) restaurar lo ajustado antes (por si se pasó a horizontal o cambió el contenido)
       panel.querySelectorAll('.bp-hint').forEach(function(e){ e.remove(); });
       panel.querySelectorAll('[data-bpz]').forEach(function(e){ e.style.zoom = ''; e.removeAttribute('data-bpz'); });
-      panel.querySelectorAll('[data-bpg]').forEach(function(e){ e.style.removeProperty('grid-template-columns'); e.removeAttribute('data-bpg'); });
+      panel.querySelectorAll('[data-bpg]').forEach(function(e){ var o = e.getAttribute('data-bpgo'); if (o) e.style.setProperty('grid-template-columns', o); else e.style.removeProperty('grid-template-columns'); e.removeAttribute('data-bpg'); e.removeAttribute('data-bpgo'); });
       if (!esMovil()) return;
       // 2) rejillas con columnas demasiado angostas → menos columnas
       panel.querySelectorAll('*').forEach(function(e){
@@ -35329,7 +35338,7 @@ window.bpGuardia = function(){
         var pesado = !!e.querySelector(':scope > * svg, :scope > * canvas, :scope > * table, :scope > * img, :scope > svg, :scope > canvas, :scope > table');
         if (n === 2 && (m < 165 || (pesado && m < 330))) nuevo = '1fr';
         else if (n >= 3 && m < 92) nuevo = (e.offsetWidth / 2 >= 120) ? 'repeat(2,minmax(0,1fr))' : '1fr';
-        if (nuevo) { e.style.setProperty('grid-template-columns', nuevo, 'important'); e.setAttribute('data-bpg', '1'); }
+        if (nuevo) { e.setAttribute('data-bpgo', e.style.getPropertyValue('grid-template-columns') || ''); e.style.setProperty('grid-template-columns', nuevo, 'important'); e.setAttribute('data-bpg', '1'); }
       });
       // 3) recuadros más anchos que la pantalla → se achican lo justo para que entren
       var cand = panel.querySelectorAll('.card,.tw,table,div');
@@ -35355,10 +35364,15 @@ window.bpGuardia = function(){
         }
       });
     } catch(err) { console.warn('ajuste', err); }
-    finally { ajustando = false; }
+    finally {
+      ajustando = false;
+      // el reacomodo no debe mover dónde estás parado
+      try { if (Math.abs((window.pageYOffset || 0) - yAntes) > 2) window.scrollTo(0, yAntes); } catch(e) {}
+    }
   }
   function programar(){ clearTimeout(tAj); tAj = setTimeout(ajustar, 220); }
-  window.addEventListener('resize', programar); window.addEventListener('orientationchange', programar);
+  // en el iPhone la barra de Safari sube y baja al deslizar y eso dispara 'resize' solo de alto: no hay nada que reacomodar
+  window.addEventListener('resize', function(){ if (window.innerWidth !== anchoPrev) { anchoPrev = window.innerWidth; programar(); } }); window.addEventListener('orientationchange', programar);
   window.bpAjustar = ajustar;
   // Guardado local inmediato: el scouting de cada persona se guarda apenas hace algo (y al salir de la app)
   var tSave = null, pendiente = false;
@@ -36376,18 +36390,21 @@ window.bpGuardia = function(){
       '.bpc-dia small{font-size:10.5px;color:var(--text3,#888);font-weight:600;text-transform:none;letter-spacing:0}' +
       '.bpc-hoy{background:var(--green,#2ecc71);color:#000;border-radius:20px;padding:1px 8px;font-size:9.5px;font-weight:800;letter-spacing:.4px}' +
       '.bpc-card{border:1px solid var(--border,#2a2a2a);border-radius:12px;overflow:hidden;background:var(--bg2,transparent)}' +
-      '.bpc-row{display:grid;grid-template-columns:54px 1fr 84px 1fr 108px;gap:10px;align-items:center;padding:10px 12px;border-top:1px solid var(--border,#2a2a2a)}' +
-      '.bpc-row:first-child{border-top:0}' +
-      '.bpc-row.mio{background:color-mix(in srgb,var(--green,#2ecc71) 12%,transparent)}' +
-      '.bpc-h{font-size:12px;font-weight:700;color:var(--text2,#bbb)}' +
-      '.bpc-eq{font-size:13px;display:flex;align-items:center;gap:6px;min-width:0}.bpc-eq.r{justify-content:flex-end;text-align:right}' +
-      '.bpc-eq span{overflow:hidden;text-overflow:ellipsis}.bpc-eq img{width:20px;height:20px;object-fit:contain;flex:none}' +
-      '.bpc-w{font-weight:800;color:var(--text,#eee)}' +
-      '.bpc-sc{font-weight:900;font-size:15px;white-space:nowrap;text-align:center;min-width:74px}' +
-      '.bpc-pend{color:var(--text3,#888);font-weight:600;font-size:12px}' +
-      '.bpc-x{font-size:10.5px;color:var(--text3,#888);grid-column:2/-1;margin-top:-4px}' +
-      '.bpc-row .btn{white-space:nowrap}' +
-      '@media(max-width:620px){.bpc-row{grid-template-columns:48px 1fr auto;row-gap:2px}.bpc-eq.r{justify-content:flex-start;text-align:left}.bpc-h{grid-row:1/3}.bpc-sc{grid-row:1/3;grid-column:3}.bpc-row .btn{grid-column:2/-1}.bpc-x{grid-column:2/-1}}';
+      '.bpc-g{padding:10px 14px 11px;border-top:1px solid var(--border,#2a2a2a)}' +
+      '.bpc-g:first-child{border-top:0}' +
+      '.bpc-g.mio{background:color-mix(in srgb,var(--green,#2ecc71) 11%,transparent)}' +
+      '.bpc-meta{display:flex;align-items:center;gap:8px;margin-bottom:7px;font-size:11px;color:var(--text3,#888);min-height:24px}' +
+      '.bpc-h{font-weight:800;color:var(--text2,#bbb);font-size:12px}' +
+      '.bpc-st{font-weight:700;font-size:10px;letter-spacing:.4px;text-transform:uppercase;padding:1px 7px;border-radius:20px;border:1px solid var(--border2,#333)}' +
+      '.bpc-st.fin{color:var(--text3,#888)}.bpc-st.pen{color:var(--text3,#888);border-style:dashed}.bpc-st.sr{color:#d4a017;border-color:#d4a017}' +
+      '.bpc-meta .btn{margin-left:auto;white-space:nowrap;padding:3px 9px}' +
+      '.bpc-t{display:flex;align-items:center;gap:9px;padding:3px 0;min-width:0}' +
+      '.bpc-t img{width:24px;height:24px;object-fit:contain;flex:none}' +
+      '.bpc-t i{width:24px;height:24px;flex:none;border-radius:50%;background:var(--bg3,#222);border:1px solid var(--border2,#333);color:var(--text3,#888);font:800 10px/22px inherit;font-style:normal;text-align:center;overflow:hidden}' +
+      '.bpc-t span{flex:1;min-width:0;font-size:13.5px;color:var(--text2,#bbb);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+      '.bpc-t b{flex:none;min-width:30px;text-align:right;font-size:16px;font-weight:700;color:var(--text3,#888);font-variant-numeric:tabular-nums}' +
+      '.bpc-t.w span{color:var(--text,#eee);font-weight:800}.bpc-t.w b{color:var(--text,#eee);font-weight:900}' +
+      '.bpc-pie{margin-top:5px;font-size:10.5px;color:var(--text3,#888);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}';
     document.head.appendChild(st);
   }
   function eqsCal(P) { var s = {}; P.forEach(function (e) { s[e.l] = 1; s[e.v] = 1; }); return Object.keys(s).sort(); }
@@ -36411,12 +36428,16 @@ window.bpGuardia = function(){
     if (!V.length) return h + '<div class="bpc-res" style="text-align:center;padding:24px">No hay partidos para este filtro.</div>';
     var fila = function (e) {
       var f = e.fname ? String(e.fname).replace(/\\/g, '\\\\').replace(/'/g, "\\'") : '', lgL = logoEq(e.l), lgV = logoEq(e.v);
-      var centro = e.jugado ? esc(e.a) + ' — ' + esc(e.b) : '<span class="bpc-pend">' + (e.d && e.d < hoy ? 'sin resultado' : 'por jugar') + '</span>';
+      var pend = !e.jugado, sr = pend && e.d && e.d < hoy;
+      var est = e.jugado ? '<span class="bpc-st fin">Final</span>' : (sr ? '<span class="bpc-st sr">Sin resultado</span>' : '<span class="bpc-st pen">Por jugar</span>');
       var btn = e.fname ? '<button class="btn btn-sm" style="border-color:var(--green);color:var(--green)" onclick="openBSByFname(\'' + f + '\')">📋 Box Score</button>' : '';
-      var extra = [e.c, e.fecha ? 'Fecha ' + e.fecha : ''].filter(Boolean).join(' · ');
-      return '<div class="bpc-row"><div class="bpc-h">' + esc(e.h || (e.d ? '—' : '')) + '</div>' +
-        '<div class="bpc-eq' + (e.jugado && e.a > e.b ? ' bpc-w' : '') + '">' + (lgL ? '<img alt="" src="' + esc(lgL) + '">' : '') + '<span>' + esc(e.l) + '</span></div><div class="bpc-sc">' + centro + '</div>' +
-        '<div class="bpc-eq r' + (e.jugado && e.b > e.a ? ' bpc-w' : '') + '"><span>' + esc(e.v) + '</span>' + (lgV ? '<img alt="" src="' + esc(lgV) + '">' : '') + '</div>' + (btn || '<span></span>') + (extra ? '<div class="bpc-x">' + esc(extra) + '</div>' : '') + '</div>';
+      var ganL = e.jugado && e.a > e.b, ganV = e.jugado && e.b > e.a;
+      var eqp = function (nom, lg, gan, pts) {
+        return '<div class="bpc-t' + (gan ? ' w' : '') + '">' + (lg ? '<img alt="" src="' + esc(lg) + '">' : '<i>' + esc(String(nom || '?').replace(/[^A-Za-zÁÉÍÓÚÑ0-9]/g, '').charAt(0).toUpperCase()) + '</i>') + '<span>' + esc(nom) + '</span><b>' + (e.jugado ? esc(pts) : '') + '</b></div>';
+      };
+      var pie = [e.c ? '🏟 ' + e.c : ''].filter(Boolean).join('');
+      return '<div class="bpc-g' + ((mismo(e.l, yo) || mismo(e.v, yo)) && yo ? ' mio' : '') + '"><div class="bpc-meta"><span class="bpc-h">' + esc(e.h || (e.d ? '—' : '')) + '</span>' + est + (e.fecha ? '<span>Fecha ' + esc(e.fecha) + '</span>' : '') + btn + '</div>' +
+        eqp(e.l, lgL, ganL, e.a) + eqp(e.v, lgV, ganV, e.b) + (pie ? '<div class="bpc-pie">' + esc(pie) + '</div>' : '') + '</div>';
     };
     ks.forEach(function (k) {
       var ps = dias[k].slice().sort(function (a, b) { return (a.h || '99') < (b.h || '99') ? -1 : (a.h || '99') > (b.h || '99') ? 1 : 0; });
@@ -38015,6 +38036,33 @@ window.bpGuardia = function(){
       '<div style="margin-top:16px;font-size:10px;color:#888">★ = mejor valor entre los jugadores elegidos.</div>' +
       '<div style="margin-top:14px;padding-top:10px;border-top:1px solid #eee;font-size:9px;color:#aaa;text-align:center">Generado con BasketPro · ' + new Date().toLocaleDateString('es-AR') + '</div></body></html>';
   };
+})();
+
+/* ── Informes de situación (Staff / Dirigencia): que se lean bien en el celular y que la nota de fuentes no asuste ── */
+(function(){
+  var RESP = '<style>@media(max-width:600px){' +
+    'body{padding:16px 14px!important}' +
+    '.ed-titulo{font-size:27px!important}' +
+    '.sit-kpis{grid-template-columns:repeat(3,minmax(0,1fr))!important}' +
+    '.sit-kpi b{font-size:19px!important}' +
+    '.sit-2,.sit-fichas{grid-template-columns:1fr!important}' +
+    '.sit-pb{break-before:auto!important}' +
+    '.sit-t{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}' +
+    'svg{max-width:100%;height:auto}' +
+    '}</style>';
+  if (typeof _sitCSS === 'function') { var o = _sitCSS; window._sitCSS = function(){ return o.apply(this, arguments) + RESP; }; }
+  if (typeof _htmlFuentesDatos === 'function') {
+    var of = _htmlFuentesDatos;
+    window._htmlFuentesDatos = function(juegos, opt){
+      if (!(opt && opt.compacto)) return of.apply(this, arguments);
+      var js = (juegos || []).filter(Boolean); if (!js.length) return '';
+      var f = js.map(_fuentesPartido), con = f.filter(function(x){ return x.pbp; }).length;
+      var txt = con === f.length ? 'Con play-by-play en los ' + f.length + ' partidos.'
+        : (con ? 'Play-by-play en ' + con + ' de ' + f.length + ' partidos; los promedios salen del box score de todos.'
+                : 'Basado en el box score de ' + f.length + ' partido' + (f.length === 1 ? '' : 's') + '.');
+      return '<div style="margin:8px 0 2px;font-size:10.5px;color:#888">' + txt + '</div>';
+    };
+  }
 })();
 
 </script>
