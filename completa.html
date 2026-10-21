@@ -11517,7 +11517,7 @@ function perfDetail(name) {
         ${(() => { const mp = (typeof _mapaTiroDeJugador==='function') ? _mapaTiroDeJugador(p.name, equipoActual, {sinTitulo:true}) : ''; return mp
           ? mp.replace('style="margin-top:10px"','style="margin-top:2px"')
           : '<div style="flex:1;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--text3);font-size:11px;padding:10px">Sin tiros ubicados todavía.</div>'; })()}
-        <button onclick="abrirMapaJugador('${p.name.replace(/'/g,"\\'")}','${(equipoActual||'').replace(/'/g,"\\'")}')" style="margin-top:8px;padding:7px;border-radius:7px;border:1px solid var(--green);background:transparent;color:var(--green);font-size:11px;font-weight:700;cursor:pointer">🎯 Ver / cargar mapa de tiro</button>
+        <button onclick="abrirMapaJugador('${p.name.replace(/'/g,"\\'")}','${(equipoActual||'').replace(/'/g,"\\'")}')" style="margin-top:8px;padding:7px;border-radius:7px;border:1px solid var(--green);background:transparent;color:var(--green);font-size:11px;font-weight:700;cursor:pointer">🎯 Ver mapa de tiro por partido</button>
       </div>
 
     </div>
@@ -20763,8 +20763,8 @@ function _mjHtmlVista() {
   }
   const hay = _mjSumaZonas(a.total).i > 0;
   const mapa = hay ? _svgMapaZonasDe(a.total, '🎯 ' + escHtml(_mj.nombre), _mjSubtitulo(a, _mj), { ancho: 400 }) + _mjHtmlResumen(a.total, false)
-    : `<div style="padding:22px;text-align:center;color:${c3};font-size:12px;border:1px dashed var(--border2,#ccc);border-radius:10px">Sin tiros ubicados en los partidos elegidos. Marcá partidos con datos o cargá los tiros a mano con <b>Cargar</b>.</div>`;
-  return `<div style="font-size:11px;color:${c3};margin-bottom:6px">Elegí qué partidos suman. Los del play-by-play ya vienen ubicados; a los que no tienen les podés cargar los tiros por zona.</div>
+    : `<div style="padding:22px;text-align:center;color:${c3};font-size:12px;border:1px dashed var(--border2,#ccc);border-radius:10px">Sin tiros ubicados en los partidos elegidos. Marcá partidos con datos.</div>`;
+  return `<div style="font-size:11px;color:${c3};margin-bottom:6px">Elegí qué partidos suman. Los del play-by-play ya vienen ubicados.</div>
     <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">
       <thead><tr style="font-size:10px;color:${c3};text-transform:uppercase">
         <th style="padding:4px 6px"><input type="checkbox" title="Todos" ${a.filas.filter(f => f.fuente).every(f => f.sel) && a.filas.some(f => f.fuente) ? 'checked' : ''} onchange="_mjToggleTodos(this.checked)"></th>
@@ -35295,7 +35295,7 @@ window.bpIniciar = function(){
 </style>
 <script id="bp-publico-guardia">
 window.bpGuardia = function(){
-  var BLOQ = ["abrirCargaPartido", "borrarPartidosPBP", "diagnosticarPlantilla", "editarDatosDeFixture", "limpiarOrdenManual", "moverEnTabla", "openEtapaForm", "openNotaByFname", "openQByFname", "openVideoByFname", "openAccOrUpload", "showGestionModal", "exportBackup", "triggerImportBackup", "importBackupFile"], OCULTAS = ["cfg", "hist"];
+  var BLOQ = ["abrirCargaPartido", "borrarPartidosPBP", "diagnosticarPlantilla", "editarDatosDeFixture", "limpiarOrdenManual", "moverEnTabla", "abrirModalPlayByPlay", "_mjEditar", "openEtapaForm", "openNotaByFname", "openQByFname", "openVideoByFname", "openAccOrUpload", "showGestionModal", "exportBackup", "triggerImportBackup", "importBackupFile"], OCULTAS = ["cfg", "hist"];
   BLOQ.forEach(function(n){ window[n] = function(){ return false; }; });
   var swOrig = window.sw;
   window.sw = function(p){ if (OCULTAS.indexOf(p) >= 0) p = 'home'; return swOrig.apply(this, arguments.length ? [p].concat([].slice.call(arguments,1)) : [p]); };
@@ -37855,6 +37855,166 @@ window.bpGuardia = function(){
     w.__bpDom = 1; window.rHome = w; return true;
   }
   envolver();
+})();
+
+</script>
+<script id="bp-infjug">
+/* bp-infjug — Informe para jugador (liga): la selección manda.
+   - Nada viene marcado de entrada: elegís 1, 2, 3… y el informe sale solo con esos.
+   - El filtro de club/posición ya no cambia qué entra al informe (antes, sin tocar nada, entraba toda la liga).
+   - La comparación se adapta a la cantidad: pocas = tarjetas grandes y tabla ancha; muchas = compacto y partido en bloques. */
+(function(){
+  if (typeof _infRenderPanelJugadoresLiga !== 'function' || typeof _infHtmlComparativa !== 'function') return;
+  var MAXBLOQ = 6;
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]; }); }
+  function corto(n){ try { return typeof sn === 'function' ? sn(n) : n; } catch(e){ return n; } }
+  function todos(){ try { return _infGetJugadoresLiga(); } catch(e){ return []; } }
+  function asegurar(){ if (!(_infJugLigaSel instanceof Set)) _infJugLigaSel = new Set(); }
+  function elegidos(){
+    asegurar();
+    var porKey = {}; todos().forEach(function(p){ porKey[_infJugLigaKey(p)] = p; });
+    var out = []; _infJugLigaSel.forEach(function(k){ if (porKey[k]) out.push(porKey[k]); });
+    return out;
+  }
+  function visibles(players){
+    return players.filter(function(p){
+      if (_infJugLigaClub && p.team !== _infJugLigaClub) return false;
+      if (_infJugLigaPos === 'all') return true;
+      try { var q = getPlayerPosition(p.name); return q.pos1 === _infJugLigaPos || q.pos2 === _infJugLigaPos; } catch(e){ return true; }
+    });
+  }
+  var clubIni = false;
+  function clubPorDefecto(players){
+    if (clubIni) return; clubIni = true;
+    try {
+      if (_infJugLigaClub || (typeof esVistaGlobal === 'function' && esVistaGlobal())) return;
+      var eq = activeTeamName(); if (!eq) return;
+      var hit = players.map(function(p){ return p.team; }).filter(function(t, i, a){ return t && a.indexOf(t) === i; }).filter(function(t){ return typeof teamNameMatch === 'function' ? teamNameMatch(t, eq) : t === eq; })[0];
+      if (hit) _infJugLigaClub = hit;
+    } catch(e){}
+  }
+  function repintar(){ _infRenderPanelJugadorAudiencia('inf-jugador-panel'); }
+
+  window._infJugLigaToggle = function(key, on){ asegurar(); if (on) _infJugLigaSel.add(key); else _infJugLigaSel['delete'](key); repintar(); };
+  window._infJugLigaAll = function(on){
+    asegurar();
+    if (!on) _infJugLigaSel = new Set();
+    else visibles(todos()).forEach(function(p){ _infJugLigaSel.add(_infJugLigaKey(p)); });
+    repintar();
+  };
+  window._infJugLigaSetClub = function(v){ _infJugLigaClub = v; clubIni = true; repintar(); };   // la selección se conserva: se puede comparar entre clubes
+  window._infJugLigaSetPos = function(v){ _infJugLigaPos = v; repintar(); };
+  window._infJugLigaQuitar = function(key){ asegurar(); _infJugLigaSel['delete'](key); repintar(); };
+
+  window._infRenderPanelJugadoresLiga = function(){
+    asegurar();
+    var players = todos();
+    players.sort(function(a,b){ return (b.prom.VAL||0) - (a.prom.VAL||0); });
+    clubPorDefecto(players);
+    var clubes = players.map(function(p){ return p.team; }).filter(function(t, i, a){ return t && a.indexOf(t) === i; }).sort();
+    var estS = 'background:var(--bg2);border:0.5px solid var(--border);color:var(--text);border-radius:6px;padding:5px 9px;font-size:12px;margin:0 6px 6px 0;max-width:100%';
+    var clubSel = '<select onchange="_infJugLigaSetClub(this.value)" style="' + estS + '"><option value="">Todos los clubes</option>' +
+      clubes.map(function(c){ return '<option value="' + esc(c) + '"' + (_infJugLigaClub === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select>';
+    var posSet = {}; players.forEach(function(p){ try { var q = getPlayerPosition(p.name).pos1; if (q) posSet[q] = 1; } catch(e){} });
+    var posKeys = Object.keys(posSet);
+    var posLabel = { all:'Todas las posiciones', Base:'Bases', Escolta:'Escoltas', Alero:'Aleros', 'Ala-Pivot':'Ala-Pívots', Pivot:'Pívots' };
+    var posSelH = posKeys.length ? '<select onchange="_infJugLigaSetPos(this.value)" style="' + estS + '">' +
+      ['all'].concat(posKeys).map(function(q){ return '<option value="' + esc(q) + '"' + (_infJugLigaPos === q ? ' selected' : '') + '>' + esc(posLabel[q] || q) + '</option>'; }).join('') + '</select>' : '';
+    var vis = visibles(players);
+    var filas = vis.map(function(p){
+      var key = _infJugLigaKey(p), on = _infJugLigaSel.has(key), pos = '';
+      try { pos = getPlayerPosition(p.name).pos1 || ''; } catch(e){}
+      return '<label style="display:flex;align-items:center;gap:8px;padding:5px 8px;font-size:12px;color:var(--text2);cursor:pointer">' +
+        '<input type="checkbox" ' + (on ? 'checked' : '') + ' onchange="_infJugLigaToggle(\'' + key.replace(/\\/g,'\\\\').replace(/'/g, "\\'") + '\',this.checked)" style="accent-color:var(--blue,#1565c0);width:15px;height:15px">' +
+        '<span style="flex:1">' + esc(corto(p.name)) + '</span>' +
+        '<span style="font-size:9px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:70px">' + esc(p.team || '') + '</span>' +
+        (pos ? '<span style="font-size:9px;color:var(--text3)">' + esc(pos) + '</span>' : '') + '</label>';
+    }).join('');
+    var sel = elegidos();
+    var chips = sel.length ? '<div style="display:flex;flex-wrap:wrap;gap:5px;margin:8px 0 2px">' + sel.map(function(p){
+      return '<span style="display:inline-flex;align-items:center;gap:5px;padding:3px 4px 3px 9px;border-radius:999px;background:rgba(21,101,192,.14);border:1px solid rgba(21,101,192,.4);font-size:11px;color:var(--text)">' + esc(corto(p.name)) +
+        '<button onclick="_infJugLigaQuitar(\'' + _infJugLigaKey(p).replace(/\\/g,'\\\\').replace(/'/g, "\\'") + '\')" title="Quitar" style="border:none;background:none;color:var(--text3);cursor:pointer;font-size:13px;line-height:1;padding:0 3px">✕</button></span>';
+    }).join('') + '</div>' : '';
+    var boton;
+    if (sel.length === 1) boton = '<button onclick="_infAbrirInformeCompleto(\'' + _infJugLigaKey(sel[0]).replace(/\\/g,'\\\\').replace(/'/g, "\\'") + '\')" style="width:100%;padding:11px;background:#1b7a3d;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px">📄 Ver informe completo de ' + esc(corto(sel[0].name)) + '</button>';
+    else if (sel.length >= 2) boton = '<button onclick="_infAbrirComparativa()" style="width:100%;padding:11px;background:#1565c0;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px">🆚 Ver comparación de ' + sel.length + ' jugadores</button>';
+    else boton = '<div style="font-size:12px;color:var(--text3)">Tocá los jugadores que querés incluir.</div>';
+    var torneo = ''; try { torneo = (cfgData.torneo || '') + (cfgData.division ? (' · ' + cfgData.division) : ''); } catch(e){}
+    return '<div style="margin-bottom:14px">' +
+      '<div style="font-size:11px;color:var(--text3);margin-bottom:8px">Elegí un jugador para su informe individual completo, o 2 o más para compararlos. Liga: <b style="color:var(--text)">' + esc(torneo) + '</b></div>' +
+      clubSel + posSelH +
+      '<div style="display:flex;gap:8px;margin:2px 0 6px"><button class="btn btn-sm" onclick="_infJugLigaAll(true)" style="font-size:11px;padding:3px 8px">Todos los de la lista</button>' +
+      '<button class="btn btn-sm" onclick="_infJugLigaAll(false)" style="font-size:11px;padding:3px 8px">Ninguno</button></div>' +
+      '<div style="max-height:260px;overflow:auto;border:1px solid var(--border2);border-radius:8px;padding:6px">' + (filas || '<div style="color:var(--text3);font-size:12px;padding:10px">No hay jugadores para este filtro.</div>') + '</div>' +
+      chips + '<div style="margin-top:10px">' + boton + '</div></div>';
+  };
+
+  // ── Comparación: el diseño se ajusta a cuántos se eligieron ──
+  window._infHtmlComparativa = function(){
+    var torneo = 'Liga'; try { torneo = cfgData.torneo || 'Liga'; } catch(e){}
+    var datos = elegidos(), n = datos.length;
+    var pc = { TC2pct:1, TC3pct:1, TLpct:1, eFG:1, TS:1, usg:1, ast:1, tovPct:1, tpar:1, ftr:1 };
+    var modo = n <= 3 ? 'grande' : (n <= 6 ? 'medio' : 'compacto');
+    var cfg = { grande:{ cols:Math.max(n,1), av:60, nom:15, val:34, tab:13, pad:'8px 10px', ph:92 },
+                medio:{ cols:3, av:44, nom:12.5, val:24, tab:12, pad:'5px 8px', ph:70 },
+                compacto:{ cols:4, av:32, nom:10.5, val:18, tab:11, pad:'4px 5px', ph:52 } }[modo];
+    var met = CMP_METRICS.slice();
+    function f(v){ return (typeof f1 === 'function') ? f1(v) : (Math.round(v*10)/10); }
+    // mejor valor por métrica sobre TODA la selección
+    var mejor = {}, victorias = datos.map(function(){ return 0; }), totalMet = 0;
+    met.forEach(function(m){
+      var vals = datos.map(function(p){ var v = p.prom[m.k]; return (v === undefined || v === null) ? null : v; });
+      var ok = vals.filter(function(v){ return v !== null; });
+      if (ok.length < 2) { mejor[m.k] = null; return; }
+      var b = m.h ? Math.max.apply(null, ok) : Math.min.apply(null, ok);
+      if (ok.every(function(v){ return v === b; })) { mejor[m.k] = null; return; }
+      mejor[m.k] = b; totalMet++;
+      vals.forEach(function(v, i){ if (v === b) victorias[i]++; });
+    });
+    var fotos = {}; try { fotos = (typeof playerPhotos !== 'undefined' && playerPhotos) ? playerPhotos : {}; } catch(e){}
+    var tarj = datos.map(function(p, i){
+      var col = PAL[i % PAL.length], pr = p.prom;
+      var ini = p.name.split(',').map(function(s){ return s.trim()[0]; }).filter(Boolean).slice(0,2).join('').toUpperCase();
+      var av = fotos[p.name]
+        ? '<img class="av" src="' + esc(fotos[p.name]) + '" style="width:' + cfg.av + 'px;height:' + cfg.av + 'px;border-radius:50%;object-fit:cover;object-position:50% 20%;border:2px solid ' + col + ';display:block;margin:0 auto 6px">'
+        : '<div class="av" style="width:' + cfg.av + 'px;height:' + cfg.av + 'px;border-radius:50%;background:' + col + ';color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:' + Math.round(cfg.av*.32) + 'px;margin:0 auto 6px">' + esc(ini) + '</div>';
+      var extra = modo === 'grande'
+        ? '<div class="ex" style="display:flex;justify-content:center;gap:14px;margin-top:10px;font-size:11px;color:#555">' + [['PTS','PTS'],['REB','REB'],['AST','AST']].map(function(x){ return '<span><b style="font-size:15px;color:#1a1a2e">' + f(pr[x[0]] || 0) + '</b><br><span style="font-size:9px;color:#888">' + x[1] + '</span></span>'; }).join('') + '</div>' : '';
+      var gana = totalMet ? '<div style="font-size:9px;color:#888;margin-top:' + (modo === 'compacto' ? 2 : 6) + 'px">★ ' + victorias[i] + ' de ' + totalMet + '</div>' : '';
+      return '<div style="border:1px solid #ddd;border-top:4px solid ' + col + ';border-radius:10px;padding:' + (modo === 'compacto' ? '8px 6px' : '14px 10px') + ';text-align:center;min-width:0">' + av +
+        '<div class="nm" title="' + esc(p.name) + '" style="font-size:' + cfg.nom + 'px;font-weight:700;color:#1a1a2e;overflow:hidden;text-overflow:ellipsis;white-space:' + (modo === 'grande' ? 'normal' : 'nowrap') + '">' + esc(corto(p.name)) + '</div>' +
+        '<div style="font-size:9px;color:#888">' + esc(p.team || '') + ' · ' + (p.pg || pr.PG || 0) + ' PJ</div>' +
+        '<div class="vl" style="font-size:' + cfg.val + 'px;font-weight:900;color:' + col + ';line-height:1.1;margin-top:6px">' + f(pr.VAL) + '</div>' +
+        '<div style="font-size:8px;color:#888;text-transform:uppercase">Valoración</div>' + extra + gana + '</div>';
+    }).join('');
+    // tabla(s): bloques de hasta MAXBLOQ jugadores, mismas métricas, mismo "mejor"
+    var nb = Math.max(1, Math.ceil(n / MAXBLOQ)), tam = Math.ceil(n / nb), tablas = '';
+    for (var b0 = 0; b0 < n; b0 += tam) {
+      var idx = []; for (var k = b0; k < Math.min(n, b0 + tam); k++) idx.push(k);
+      var head = idx.map(function(i){ return '<th style="text-align:center;padding:' + cfg.pad + ';border-bottom:2px solid ' + PAL[i % PAL.length] + ';color:#1a1a2e;font-size:' + cfg.tab + 'px">' + esc(corto(datos[i].name)) + '</th>'; }).join('');
+      var grupoPrev = '', filas = '';
+      met.forEach(function(m){
+        if (m.g !== grupoPrev) { grupoPrev = m.g; filas += '<tr><td colspan="' + (idx.length + 1) + '" style="padding:8px 8px 3px;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:#1565c0;border-bottom:1px solid #cfd8ea">' + esc(m.g || '') + '</td></tr>'; }
+        filas += '<tr><td style="text-align:left;padding:' + cfg.pad + ';color:#666;border-bottom:1px solid #eee;font-size:' + (cfg.tab - 1) + 'px;white-space:nowrap">' + esc(m.l) + '</td>' + idx.map(function(i){
+          var v = datos[i].prom[m.k]; v = (v === undefined || v === null) ? null : v;
+          var col = PAL[i % PAL.length], best = v !== null && mejor[m.k] !== null && v === mejor[m.k];
+          var disp = v === null ? '—' : (pc[m.k] ? f(v) + '%' : f(v));
+          return '<td style="text-align:center;padding:' + cfg.pad + ';border-bottom:1px solid #eee;font-size:' + cfg.tab + 'px;' + (best ? 'background:' + col + '22;font-weight:800;color:' + col : 'color:#333') + '">' + disp + (best ? ' ★' : '') + '</td>';
+        }).join('') + '</tr>';
+      });
+      tablas += '<div style="overflow-x:auto;margin-top:16px;page-break-inside:avoid"><table style="width:100%;border-collapse:collapse"><thead><tr><th style="text-align:left;padding:' + cfg.pad + ';color:#888;font-size:10px;text-transform:uppercase;border-bottom:1px solid #ddd">Métrica</th>' + head + '</tr></thead><tbody>' + filas + '</tbody></table></div>';
+    }
+    return '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Comparación de jugadores — ' + esc(torneo) + '</title>' +
+      '<style>@page{margin:12mm}*{box-sizing:border-box}body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#1a1a2e;max-width:' + (modo === 'grande' ? 760 : 900) + 'px;margin:0 auto;padding:18px}' +
+      '.cards{display:grid;grid-template-columns:repeat(' + cfg.cols + ',minmax(0,1fr));gap:10px}' +
+      '@media(max-width:560px){.cards{grid-template-columns:repeat(' + (n <= 3 ? Math.max(n,1) : 2) + ',minmax(0,1fr))}' + (n <= 3 ? '.av{width:42px!important;height:42px!important}.nm{font-size:11.5px!important}.vl{font-size:24px!important}.ex{gap:7px!important}.ex b{font-size:13px!important}' : '') + '}</style></head><body>' +
+      '<div style="border-bottom:3px solid #1565c0;padding-bottom:12px;margin-bottom:16px"><div style="font-size:11px;color:#1565c0;font-weight:700;text-transform:uppercase;letter-spacing:1px">Informe para jugador</div>' +
+      '<div style="font-size:' + (modo === 'compacto' ? 22 : 26) + 'px;font-weight:900">Comparación de jugadores</div>' +
+      '<div style="font-size:13px;color:#666">' + esc(torneo) + ' · ' + n + ' jugadores</div></div>' +
+      '<div class="cards">' + tarj + '</div>' + tablas +
+      '<div style="margin-top:16px;font-size:10px;color:#888">★ = mejor valor entre los jugadores elegidos.</div>' +
+      '<div style="margin-top:14px;padding-top:10px;border-top:1px solid #eee;font-size:9px;color:#aaa;text-align:center">Generado con BasketPro · ' + new Date().toLocaleDateString('es-AR') + '</div></body></html>';
+  };
 })();
 
 </script>
