@@ -35132,6 +35132,22 @@ function doHomeExport(type='pdf') {
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Init directly
+/* Celulares (sobre todo iPhone): localStorage tiene un tope chico (~5 MB). Si una liga publicada es grande no entra, y antes
+   la app decía "No se pudo abrir la liga en este dispositivo". Ahora, si el guardado falla, los datos de la liga quedan en memoria
+   mientras la app está abierta (se vuelven a bajar la próxima vez). */
+(function(){
+  try {
+    var P = Storage.prototype, g = P.getItem, st = P.setItem, rm = P.removeItem, mem = {}, mio = function(o, k){ return o === window.localStorage && String(k).indexOf('bball_') === 0; };
+    window.__bpMem = mem;
+    P.getItem = function(k){ if (mio(this, k) && Object.prototype.hasOwnProperty.call(mem, k)) return mem[k]; return g.call(this, k); };
+    P.setItem = function(k, v){
+      if (!mio(this, k)) return st.call(this, k, v);
+      try { st.call(this, k, v); delete mem[k]; }
+      catch(e) { try { rm.call(this, k); } catch(e2) {} mem[k] = String(v); try { window.__bpMemUsada = true; } catch(e3) {} }
+    };
+    P.removeItem = function(k){ if (mio(this, k)) delete mem[k]; return rm.call(this, k); };
+  } catch(e) {}
+})();
 window.bpLiberar = function(k){
   // cajas de ligas: se guarda solo su scouting (chico) y se libera el espacio / los datos del dispositivo
   Object.keys(localStorage).forEach(function(x){
