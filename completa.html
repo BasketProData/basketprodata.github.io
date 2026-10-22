@@ -35295,13 +35295,46 @@ window.bpIniciar = function(){
 </style>
 <script id="bp-publico-guardia">
 window.bpGuardia = function(){
-  var BLOQ = ["abrirCargaPartido", "borrarPartidosPBP", "diagnosticarPlantilla", "editarDatosDeFixture", "limpiarOrdenManual", "moverEnTabla", "abrirModalPlayByPlay", "_mjEditar", "openEtapaForm", "openNotaByFname", "openQByFname", "openVideoByFname", "openAccOrUpload", "showGestionModal", "exportBackup", "triggerImportBackup", "importBackupFile"], OCULTAS = ["cfg", "hist"];
+  var BLOQ = ["abrirCargaPartido", "borrarPartidosPBP", "diagnosticarPlantilla", "editarDatosDeFixture", "limpiarOrdenManual", "moverEnTabla", "abrirModalPlayByPlay", "_mjEditar", "openEtapaForm", "openNotaByFname", "openQByFname", "openVideoByFname", "showGestionModal", "exportBackup", "triggerImportBackup", "importBackupFile"], OCULTAS = ["cfg", "hist"];
   BLOQ.forEach(function(n){ window[n] = function(){ return false; }; });
+  // Acciones por partido: solo lectura. Con datos publicados (VIP o abiertas) se ve la tabla; sin datos no hay botón ni cargador.
+  function accDe(idx, fname){
+    try {
+      if (accData[idx]) return accData[idx];
+      var g = (idx != null && ag()[idx]) ? ag()[idx] : ag().find(function(x){ return x.fname === fname; });
+      var r = g ? g.rival : '';
+      return Object.values(accData).find(function(d){ return d && d.fname && accMatchesGame(d.fname, d.rival, fname, r); }) || null;
+    } catch (e) { return null; }
+  }
+  window.openAccOrUpload = function(idx, fname){
+    var d = accDe(idx, fname); if (!d) return false;
+    try {
+      accModalIdx = idx; _accModalData = d;
+      document.getElementById('accModalTitle').textContent = 'Acciones — ' + fname;
+      var g = ag()[idx]; document.getElementById('accModalSub').textContent = 'vs ' + (g ? g.rival : 'rival');
+      document.getElementById('accm-vm').classList.add('on'); document.getElementById('accm-rv').classList.remove('on');
+      setAccModalTabData('vm', d);
+      document.getElementById('accModal').style.display = 'flex';
+    } catch (e) {}
+    return false;
+  };
+  function botonesAcc(raiz){
+    (raiz || document).querySelectorAll('button[onclick^="openAccOrUpload("]').forEach(function(b){
+      var m = /openAccOrUpload\(\s*ag\(\)\.findIndex\(g=>g\.fname===('(?:\'|[^'])*')\)\s*,\s*'((?:\'|[^'])*)'\)/.exec(b.getAttribute('onclick') || '');
+      var f = m ? m[2].replace(/\'/g, "'") : null;
+      var idx = f != null ? ag().findIndex(function(g){ return g.fname === f; }) : -1;
+      var hay = f != null && !!accDe(idx, f);
+      b.classList.toggle('bp-oculto', !hay);
+    });
+  }
   var swOrig = window.sw;
   var iaOrig = window._infSetAudiencia; if (typeof iaOrig === 'function') window._infSetAudiencia = function(a){ if (a === 'periodista') a = null; return iaOrig.call(this, a); };
   window.sw = function(p){ if (OCULTAS.indexOf(p) >= 0) p = 'home'; return swOrig.apply(this, arguments.length ? [p].concat([].slice.call(arguments,1)) : [p]); };
   var rx = new RegExp('^\\s*(' + BLOQ.join('|') + ')\\s*\\(');
   function limpiar(raiz){
+    try { botonesAcc(raiz); } catch (e) {}
+    (raiz || document).querySelectorAll('[onclick*="BPAcc."]').forEach(function(e){ e.classList.add('bp-oculto'); });
+    (raiz || document).querySelectorAll('#v-acc div').forEach(function(e){ if (e.children.length === 0 && /Cargar partido/.test(e.textContent || '')) e.classList.add('bp-oculto'); });
     (raiz || document).querySelectorAll('[onclick]').forEach(function(e){ if (rx.test(e.getAttribute('onclick') || '')) e.classList.add('bp-oculto'); });
     // el informe para periodista no va en la app pública
     (raiz || document).querySelectorAll('[onclick*="periodista"]').forEach(function(e){ e.classList.add('bp-oculto'); });
@@ -36126,7 +36159,7 @@ window.bpGuardia = function(){
     'addTorneo','archivarTorneo','assignColor','borrarPartidosPBP','borrarPartidosScouting','toggleBsEdit','saveBsEdit','cancelBsEdit','deleteLeague','deleteTorneo',
     'promptCreateLeague','editLeagueConfig','editarDatosDeFixture','openEtapaForm','etapaSave','closeEtapaForm','exportBackup','importBackupFile','finalizarFaseRegular',
     'reabrirFaseRegular','resetPlayoffBracket','limpiarOrdenManual','moverEnTabla','liberarAlmacenamiento','recomprimirEscudos','loadCfgLogo','quitarTeamLogo','uploadTeamLogo',
-    'perfUploadPhoto','pbpBorrar','pbpProcesar','openAccOrUpload','openNotaByFname','saveNota','openTorneoForm','closeTorneoForm','saveCfg','saveCurrentSeason','setAbrevEquipo',
+    'perfUploadPhoto','pbpBorrar','pbpProcesar','openNotaByFname','saveNota','openTorneoForm','closeTorneoForm','saveCfg','saveCurrentSeason','setAbrevEquipo',
     'setPosicionJugador','removeTorneoGame','uploadRival','clearRival','clearVideo','saveVideo','openVideoByFname','watchVideo','openQByFname','saveQ','closeQ','diagnosticarPlantilla',
     'doConfirmReset','addWin','undoWin','openColorPicker','renderAlmacenamiento','setPermanencia','closeWizard'];
   var PREFIJOS = /^(_cp|_dt|_mj|_rev|_scout|_fj|_gestion|_ep|_accm|_btnReconstruir|accm[A-Z]|tf[A-Z]|wiz[A-Z]|cfg[A-Z]|_proxJornada)/;
