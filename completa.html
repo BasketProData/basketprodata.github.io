@@ -37839,7 +37839,7 @@ window.bpGuardia = function(){
     var rows = []; try { rows = getTorneoTeams() || []; } catch (e) {}
     var canon = function (nm) { nm = String(nm || '').trim(); for (var i = 0; i < rows.length; i++) { try { if (teamNameMatch(rows[i].name, nm)) return rows[i].name; } catch (e) {} } return nm; };
     var juegos = []; try { juegos = getTorneoGamesAll() || []; } catch (e) {}
-    var T = {}, J = {}, nMapas = 0, ligaZ = {};
+    var T = {}, J = {}, nMapas = 0, ligaZ = {}, nJug = 0, hayJug;
     var tEq = function (n) { return T[n] || (T[n] = { atk: {}, def: {}, n: 0 }); };
     var addJ = function (eq, c, nombre, z) {
       var k = eq + '|' + c, j = J[k] || (J[k] = { n: nombre, eq: eq, z: {}, pj: 0 });
@@ -37858,7 +37858,7 @@ window.bpGuardia = function(){
         });
       }
       // Jugadores: primero el PBP con coordenadas; si no, la carga por jugador (HTML oficial o manual)
-      var hechos = {};
+      var hechos = {}; hayJug = false;
       try {
         if (typeof pbpTieneDatos === 'function' && pbpTieneDatos(gid)) {
           var ev = eventosPbp(gid), a = (pbpStore[gid] && pbpStore[gid].a) || {};
@@ -37873,7 +37873,7 @@ window.bpGuardia = function(){
               var eq = lado[e.equipo], c = _mjClave(e.jugador), id = eq + '|' + c, p = por[id] || (por[id] = { eq: eq, c: c, n: e.jugador, z: {} });
               var d = p.z[k] || (p.z[k] = { m: 0, i: 0 }); d.i++; if (/^CANASTA/.test(e.tipo)) d.m++;
             });
-            Object.keys(por).forEach(function (id) { var p = por[id]; addJ(p.eq, p.c, p.n, p.z); hechos[id] = 1; });
+            Object.keys(por).forEach(function (id) { var p = por[id]; addJ(p.eq, p.c, p.n, p.z); hechos[id] = 1; hayJug = true; });
           }
         }
       } catch (e) {}
@@ -37884,10 +37884,11 @@ window.bpGuardia = function(){
         var enA = en(g.playersA), enB = en(g.playersB);
         if (enA && !enB) eq = A; else if (enB && !enA) eq = B; else if (enA && enB) { eq = (g.playersA || []).some(function (p) { return String(p.N || '').toUpperCase() === String(e.n || '').toUpperCase(); }) ? A : B; }
         if (!eq || hechos[eq + '|' + c]) return;
-        addJ(eq, c, e.n, e.z);
+        addJ(eq, c, e.n, e.z); hayJug = true;
       });
+      if (hayJug) nJug++;
     });
-    return { T: T, J: J, nMapas: nMapas, nJuegos: juegos.length, ligaZ: ligaZ };
+    return { T: T, J: J, nJug: nJug, nMapas: nMapas, nJuegos: juegos.length, ligaZ: ligaZ };
   }
 
   // ── Ranking de una zona ──
@@ -37899,21 +37900,23 @@ window.bpGuardia = function(){
       var solo = enEquipo();
       Object.keys(D.J).forEach(function (k) { var j = D.J[k], d = j.z[zk]; if (d && d.i > 0 && (!solo || esMio(j.eq))) lista.push({ nombre: j.n, eq: j.eq, m: d.m, i: d.i, pj: j.pj }); });
     }
-    var minI = ST.min === 'auto' ? Math.max(enEquipo() && ST.modo === 'jug' ? 2 : 3, Math.ceil(mediana(lista.map(function (x) { return x.i; })) * 0.5)) : +ST.min;
-    lista.forEach(function (x) { x.pct = x.m / x.i * 100; x.pps = x.m * pts / x.i; });
-    var ok = lista.filter(function (x) { return x.i >= minI; });
+    var minI = ST.min === 'auto' ? Math.max(2, Math.ceil(mediana(lista.map(function (x) { return x.i; })) * 0.4)) : +ST.min;
+    var lz = D.ligaZ[zk], prior = lz && lz.i >= 10 ? lz.m * pts / lz.i : null, K = 8;
+    lista.forEach(function (x) { x.pct = x.m / x.i * 100; x.pps = x.m * pts / x.i; x.sc = prior == null ? x.pps : (x.m * pts + K * prior) / (x.i + K); x.poco = x.i < Math.max(5, minI); });
     var asc = ST.modo === 'eq' && ST.lado === 'def';
-    ok.sort(function (a, b) { return (asc ? a.pps - b.pps : b.pps - a.pps) || b.i - a.i; });
+    // se ordena por puntos por tiro "ajustado": con pocos intentos pesa más el promedio de la liga (un 3/3 no le gana a un 12/17)
+    var cmp = function (a, b) { return (asc ? a.sc - b.sc : b.sc - a.sc) || b.i - a.i; };
+    var todos = lista.slice().sort(cmp), ok = todos.filter(function (x) { return x.i >= minI; });
     var mio = null, pos = -1;
-    if (ST.modo === 'eq') { for (var q = 0; q < lista.length; q++) if (esMio(lista[q].eq)) { mio = lista[q]; break; } if (mio) pos = ok.indexOf(mio); }
-    return { lista: ok, minI: minI, total: lista.length, mio: mio, pos: pos };
+    if (ST.modo === 'eq') { for (var q = 0; q < todos.length; q++) if (esMio(todos[q].eq)) { mio = todos[q]; pos = q; break; } }
+    return { lista: ok, todos: todos, minI: minI, total: lista.length, mio: mio, pos: pos };
   }
 
   // ── Dibujo ──
   function cancha(D) {
     var cid = 'bdclip' + Math.random().toString(36).slice(2, 7), paths = '', etiq = '', esquinas = {}, W = CTH_W, H = CTH_H;
     ZONAS_CARGA.forEach(function (Z) {
-      var R = ranking(D, Z.k), mioEq = enEquipo() && ST.modo === 'eq', L = mioEq ? R.mio : R.lista[0], sel = ST.zona === Z.k;
+      var R = ranking(D, Z.k), mioEq = enEquipo() && ST.modo === 'eq', L = mioEq ? R.mio : (R.lista[0] || R.todos[0]), sel = ST.zona === Z.k;
       var fill = L ? '#6fbf82' : '#d8d4c8', op = 0.3;
       if (L) {
         var lz = D.ligaZ[Z.k], pl = lz && lz.i >= 10 ? lz.m * Z.pts / lz.i : 0, rat = pl ? (ST.modo === 'eq' && ST.lado === 'def' ? pl / Math.max(L.pps, 0.05) : L.pps / pl) : 1.2;
@@ -37927,8 +37930,8 @@ window.bpGuardia = function(){
       var cx = CTH_ARO_X + rMid * Math.cos(aMid * Math.PI / 180), cy = CTH_ARO_Y - rMid * Math.sin(aMid * Math.PI / 180);
       if (!L) return;
       var lg = ST.modo === 'eq' && !mioEq ? logo(L.eq) : '', et;
-      var nom = mioEq ? (R.pos >= 0 ? '#' + (R.pos + 1) : '–') : (ST.modo === 'eq' ? sigla(L.nombre) : String(L.nombre || '').split(',')[0].trim());
-      et = '<g ' + click + '>';
+      var nom = mioEq ? '#' + (R.pos + 1) : (ST.modo === 'eq' ? sigla(L.nombre) : String(L.nombre || '').split(',')[0].trim());
+      et = '<g ' + click + (L.poco ? ' opacity="0.62"' : '') + '>';
       if (lg) et += '<image href="' + esc(lg) + '" x="' + (cx - 9).toFixed(1) + '" y="' + (cy - 19).toFixed(1) + '" width="18" height="18" preserveAspectRatio="xMidYMid meet"/>';
       else {
         var cerca = Z.k === 'aro' || /^cerca/.test(Z.k), fs = ST.modo === 'eq' ? 11 : (cerca ? 7.2 : 8), maxW = Z.k === 'aro' ? 33 : (/^cerca/.test(Z.k) ? 42 : (/^med/.test(Z.k) ? 52 : 66)), est = String(nom).length * fs * 0.74;
@@ -37951,24 +37954,25 @@ window.bpGuardia = function(){
     if (!ST.zona) return '<div class="bd-lista" style="color:var(--text3);padding:14px 4px;line-height:1.6">👆 Tocá una zona de la cancha para ver el ranking completo.<br>En cada zona se muestra al <b>líder</b>: su escudo (o iniciales), el % de acierto y los convertidos/intentados.</div>';
     var Z = ZONAS_CARGA.filter(function (z) { return z.k === ST.zona; })[0], R = ranking(D, ST.zona), yo = miEquipo();
     var es = function (x) { try { return yo && teamNameMatch(x.eq, yo); } catch (e) { return false; } };
-    var top = R.lista.slice(0, 8);
-    var miPos = -1; if (yo && ST.modo === 'eq') for (var i = 0; i < R.lista.length; i++) if (es(R.lista[i])) { miPos = i; break; }
+    var base0 = R.lista.length ? R.lista : R.todos, top = base0.slice(0, 8);
+    var miPos = -1; if (yo && ST.modo === 'eq') for (var i = 0; i < base0.length; i++) if (es(base0[i])) { miPos = i; break; }
     var fila = function (x, i) {
       var lg = logo(x.eq);
       return '<div class="bd-fila' + (es(x) ? ' yo' : '') + '"><b style="color:var(--text3)">' + (i + 1) + '</b>' + (lg && !(ST.modo === 'jug' && enEquipo()) ? '<img alt="" src="' + esc(lg) + '">' : '<span></span>')
         + '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><b>' + esc(x.nombre) + '</b>' + (ST.modo === 'jug' && !enEquipo() ? '<br><span style="color:var(--text2,#666);font-weight:500;font-size:11px">' + esc(x.eq) + '</span>' : '') + '</span>'
-        + '<span style="text-align:right"><b>' + x.pps.toFixed(2) + '</b> <span style="color:var(--text3);font-size:10px">pts/tiro</span><br><span style="color:var(--text3);font-size:10.5px">' + Math.round(x.pct) + '% · ' + x.m + '/' + x.i + '</span></span></div>';
+        + '<span style="text-align:right"><b>' + x.pps.toFixed(2) + '</b> <span style="color:var(--text3);font-size:10px">pts/tiro</span><br><span style="color:var(--text3);font-size:10.5px">' + Math.round(x.pct) + '% · ' + x.m + '/' + x.i + (x.poco ? ' · <i>pocos tiros</i>' : '') + '</span></span></div>';
     };
     var tit = (ST.modo === 'eq' ? (ST.lado === 'atk' ? 'Mejores atacando desde ' : 'Mejores defendiendo ') : (enEquipo() ? 'Tiradores de ' + esc(yo) + ' desde ' : 'Mejores tiradores desde ')) + '<b>' + esc(Z.label) + '</b> (' + Z.pts + ' pts)';
     var h = '<div class="bd-lista"><div style="margin-bottom:6px">' + tit + '</div>';
-    if (ST.modo === 'eq' && enEquipo() && R.mio) h += '<div style="background:var(--bg2,#f1eee6);border-radius:8px;padding:6px 8px;margin-bottom:6px;font-size:12px"><b>' + esc(yo) + '</b>: ' + Math.round(R.mio.pct) + '% · ' + R.mio.m + '/' + R.mio.i + ' · ' + R.mio.pps.toFixed(2) + ' pts/tiro · ' + (R.pos >= 0 ? 'puesto ' + (R.pos + 1) + ' de ' + R.lista.length : 'no llega al mínimo de intentos') + '</div>';
-    if (!R.lista.length) h += '<div style="color:var(--text3);padding:8px 2px">Nadie llega al mínimo de ' + R.minI + ' intentos en esta zona' + (R.total ? ' (' + R.total + ' con menos)' : '') + '. Probá bajar el mínimo.</div>';
+    if (ST.modo === 'eq' && enEquipo() && R.mio) h += '<div style="background:var(--bg2,#f1eee6);border-radius:8px;padding:6px 8px;margin-bottom:6px;font-size:12px"><b>' + esc(yo) + '</b>: ' + Math.round(R.mio.pct) + '% · ' + R.mio.m + '/' + R.mio.i + ' · ' + R.mio.pps.toFixed(2) + ' pts/tiro · ' + (R.pos >= 0 ? 'puesto ' + (R.pos + 1) + ' de ' + R.todos.length + (R.mio.poco ? ' (pocos tiros)' : '') : '') + '</div>';
+    if (!R.todos.length) h += '<div style="color:var(--text3);padding:8px 2px">Todavía no hay tiros cargados desde esta zona.</div>';
+    else if (!R.lista.length) h += '<div style="color:#c8860a;padding:2px 2px 6px;font-size:11.5px">Nadie llega a ' + R.minI + ' intentos en esta zona: se muestran igual, con pocos datos.</div>' + top.map(fila).join('');
     else {
       h += top.map(fila).join('');
-      if (miPos >= 8) h += '<div style="text-align:center;color:var(--text3);font-size:11px;padding:3px">⋯</div>' + fila(R.lista[miPos], miPos);
-      else if (yo && ST.modo === 'eq' && miPos < 0) h += '<div style="color:var(--text3);font-size:11px;padding:6px 2px">Tu equipo no llega al mínimo de intentos en esta zona.</div>';
+      if (miPos >= 8) h += '<div style="text-align:center;color:var(--text3);font-size:11px;padding:3px">⋯</div>' + fila(base0[miPos], miPos);
+      else if (yo && ST.modo === 'eq' && miPos < 0) h += '<div style="color:var(--text3);font-size:11px;padding:6px 2px">Tu equipo no tiene tiros cargados desde esta zona.</div>';
     }
-    return h + '<div class="bd-nota">' + (ST.modo === 'eq' && ST.lado === 'def' ? 'Defensa: puntos por tiro que permite (menos es mejor). ' : 'Ordenado por puntos por tiro. ') + 'Mínimo: ' + R.minI + ' intentos.</div></div>';
+    return h + '<div class="bd-nota">' + (ST.modo === 'eq' && ST.lado === 'def' ? 'Defensa: puntos por tiro que permite (menos es mejor). ' : 'Ordenado por puntos por tiro, ajustado por cantidad de intentos (con pocos tiros pesa más el promedio de la liga). ') + 'Mínimo: ' + R.minI + ' intentos.</div></div>';
   }
 
   function pintar() {
@@ -37991,16 +37995,16 @@ window.bpGuardia = function(){
       + (ST.modo === 'eq' ? seg([['atk', '⚔️ Ataque'], ['def', '🛡️ Defensa']], ST.lado, 'lado') : '')
       + '<label style="font-size:11.5px;color:var(--text3)">Mín. intentos <select onchange="BPDominio.min(this.value)">'
       + [['auto', 'Automático'], ['3', '3'], ['5', '5'], ['10', '10'], ['20', '20'], ['40', '40']].map(function (o) { return '<option value="' + o[0] + '"' + (String(ST.min) === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></label></div>';
-    var base = D.nMapas + ' de ' + D.nJuegos + ' partido' + (D.nJuegos !== 1 ? 's' : '') + ' con mapa cargado' + (ST.modo === 'eq' ? ' · ' + nEq + ' equipo' + (nEq !== 1 ? 's' : '') : '');
+    var base = ST.modo === 'eq' ? (D.nMapas + ' de ' + D.nJuegos + ' partidos con mapa por zona · ' + nEq + ' equipo' + (nEq !== 1 ? 's' : '')) : (D.nJug + ' de ' + D.nJuegos + ' partidos con detalle por jugador · ' + Object.keys(D.J).length + ' jugadores');
     var aviso = D.nMapas < 3 ? '<div class="bd-nota" style="color:#c8860a;margin:0 0 8px">⚠️ Hay pocos partidos con mapa: el ranking puede cambiar mucho al cargar más.</div>' : '';
     card.innerHTML = '<div class="bd-t"><span>🗺️ Quién domina cada zona</span><small>' + base + '</small></div>'
       + '<div class="bd-sub">' + (enEquipo()
         ? (ST.modo === 'jug' ? 'Quién domina cada zona dentro de ' + esc(yoN) + ' (puntos por tiro, con mínimo de intentos).'
           : (ST.lado === 'atk' ? 'Cómo tira ' + esc(yoN) + ' desde cada zona y su puesto en la liga (#).' : 'Cuánto permite ' + esc(yoN) + ' desde cada zona y su puesto en la liga (#).'))
         : (ST.modo === 'jug' ? 'El mejor tirador de la liga desde cada zona (puntos por tiro, con mínimo de intentos).'
-          : (ST.lado === 'atk' ? 'El equipo que mejor tira desde cada zona.' : 'El equipo que deja a sus rivales tirar peor desde cada zona.'))) + '</div>'
+          : (ST.lado === 'atk' ? 'El equipo que mejor tira desde cada zona. Más tenue = pocos tiros.' : 'El equipo que deja a sus rivales tirar peor desde cada zona.'))) + '</div>'
       + ctl + aviso
-      + '<div class="bd-nota" style="margin:0 0 8px">' + (enEquipo() && ST.modo === 'eq' ? 'Verde = ' + esc(yoN) + ' rinde por encima del promedio de la liga en esa zona; naranja = por debajo. #N = su puesto entre los equipos.' : 'Color más intenso = el líder supera más al promedio de la liga en esa zona.') + '</div>'
+      + '<div class="bd-nota" style="margin:0 0 8px">' + (enEquipo() && ST.modo === 'eq' ? 'Verde = ' + esc(yoN) + ' rinde por encima del promedio de la liga en esa zona; naranja = por debajo. #N = su puesto entre los equipos.' : 'Color más intenso = el líder supera más al promedio de la liga en esa zona. Zona tenue = pocos tiros (dato poco confiable).') + '</div>'
       + '<div class="bd-wrap"><div class="bd-cancha">' + cancha(D) + '</div><div>' + lista(D) + '</div></div>';
     var ini = $('bp-ini'); (ini || v).appendChild(card);
   }
