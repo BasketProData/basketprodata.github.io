@@ -36276,7 +36276,7 @@ window.bpGuardia = function(){
   function seccionesVacias() {
     var hayP = false, hayA = false;
     try { hayP = typeof pbpStore !== 'undefined' && Object.keys(pbpStore || {}).length > 0; } catch (e) {}
-    try { hayA = typeof accData !== 'undefined' && Object.keys(accData || {}).length > 0; } catch (e) {}
+    try { hayA = typeof accData !== 'undefined' && Object.keys(accData || {}).length > 0 && (typeof window.bpAccHayEquipo !== 'function' || window.bpAccHayEquipo()); } catch (e) {}
     var pares = [[hayP, ["#nav-pbp", "[onclick*=\"sw('pbp')\"]"]], [hayA, ["#nav-acc", "#gtab-acc", "[onclick*=\"sw('acc')\"]", "[onclick*=\"setGTab('acc')\"]"]]];
     pares.forEach(function (par) {
       par[1].forEach(function (sel) {
@@ -38691,6 +38691,54 @@ window.bpGuardia = function(){
   window.BPScouting = { iniciar: iniciar, pintar: pintarHub };
   iniciar();
   setTimeout(iniciar, 800);
+})();
+
+</script>
+<script id="bp-accfix">
+/* BasketPro · Acciones: si el equipo elegido no tiene ningún partido con acciones cargadas, se muestra vacío.
+ * Antes, sin coincidencias, la pantalla "caía a todas" y mostraba las acciones de otro equipo (p. ej. Villa Mitre) en cualquier club. */
+(function () {
+  'use strict';
+  function hay() {
+    try {
+      var ks = Object.keys(accData || {}); if (!ks.length) return false;
+      var gs = ag() || [], global = (typeof esVistaGlobal === 'function' && esVistaGlobal());
+      // Las acciones son del equipo "dueño" del archivo (vm); d.rival es su rival. Un club que sólo fue RIVAL en ese partido no las hereda.
+      var cl = function (x) { try { return claveEquipo(x); } catch (e) { return String(x || '').toUpperCase().trim(); } };
+      var T = ''; try { T = cl(activeTeamName()); } catch (e) {}
+      var igual = function (x, y) { return !!x && !!y && (x === y || x.indexOf(y) >= 0 || y.indexOf(x) >= 0); };
+      var dueno = function (d, g) {
+        if (global) return true;
+        var rv = cl(d.rival);
+        if (T && igual(rv, T)) return false;                         // el club sólo fue el RIVAL de quien cargó las acciones
+        var partes = String(d.fname || '').replace(/^\s*(fecha|juego|jornada)\s*\d+\s*[-–:]\s*/i, '').split(/\s+vs\.?\s+/i);
+        if (T && partes.length === 2 && !partes.some(function (x) { return /^\s*acciones?\b/i.test(x); })) return partes.some(function (x) { return igual(cl(x), T); });   // el nombre del archivo dice quiénes jugaron
+        var gr = cl(g.rival); if (!rv || !gr) return true; return igual(rv, gr);
+      };
+      return gs.some(function (g) { return ks.some(function (k) { var d = accData[k]; return d && accMatchesGame(d.fname, d.rival, g.fname, g.rival) && dueno(d, g); }); });
+    } catch (e) { return true; }   // ante la duda no se esconde nada
+  }
+  window.bpAccHayEquipo = function () { try { if (typeof _pbpSincronizarAcciones === 'function') _pbpSincronizarAcciones(); } catch (e) {} return hay(); };
+  function msg(on) {
+    var v = document.getElementById('acc-empty'); if (!v) return;
+    var m = document.getElementById('bp-acc-vacio');
+    if (!on) { if (m) m.style.display = 'none'; return; }
+    if (!m) { m = document.createElement('div'); m.id = 'bp-acc-vacio'; m.style.cssText = 'padding:30px 16px;text-align:center;color:var(--text3);font-size:13px;line-height:1.6'; m.innerHTML = '<div style="font-size:30px;margin-bottom:6px">📋</div><b style="color:var(--text2)">Este equipo todavía no tiene acciones de juego cargadas.</b><br>Las acciones se cargan partido por partido y no están disponibles para todos los equipos.'; v.parentNode.insertBefore(m, v); }
+    m.style.display = '';
+  }
+  function envolver() {
+    if (typeof window.rAcc !== 'function' || window.rAcc.__bpf) return false;
+    var o = window.rAcc;
+    window.rAcc = function () {
+      if (Object.keys(accData || {}).length && !window.bpAccHayEquipo()) {
+        var e = document.getElementById('acc-empty'), c = document.getElementById('acc-content'), s = document.getElementById('acc-status');
+        if (e) e.style.display = 'none'; if (c) c.style.display = 'none'; if (s) s.style.display = 'none'; msg(true); return;
+      }
+      msg(false); return o.apply(this, arguments);
+    };
+    window.rAcc.__bpf = 1; return true;
+  }
+  if (!envolver()) setTimeout(envolver, 500);
 })();
 
 </script>
