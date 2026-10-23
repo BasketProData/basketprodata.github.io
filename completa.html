@@ -36238,6 +36238,8 @@ window.bpGuardia = function(){
   function sinTiros(fname) {
     try {
       var gid = typeof _gameId === 'function' ? _gameId(fname) : null;
+      var rm = gid && typeof pbpStore !== 'undefined' ? pbpStore[gid] : null;
+      if (rm && rm._remoto && !rm.raw) return !rm._coord;   // el detalle se baja al abrirlo: se sabe por el paquete si tiene ubicaciones
       var ev = gid && typeof pbpEventosCrudos === 'function' ? pbpEventosCrudos(gid) : null;
       if (ev && ev.length) return false;
       var sm = typeof shotMapStore !== 'undefined' ? shotMapStore[fname] : null;
@@ -38211,6 +38213,110 @@ window.bpGuardia = function(){
       return '<div style="margin:8px 0 2px;font-size:10.5px;color:#888">' + txt + '</div>';
     };
   }
+})();
+
+</script>
+<script id="bp-detalle">
+/* BasketPro público — detalle del play-by-play bajo demanda.
+ * El paquete de la liga trae, por partido, solo el análisis y los quintetos (liviano). Los eventos completos viven
+ * aparte (tabla pbp_detalle) y se bajan cuando se necesitan: al abrir una vista con partidos que los usan, o el
+ * mapa de tiro / informe de un partido. Una vez bajados quedan en memoria (no se guardan en el teléfono). */
+(function () {
+  'use strict';
+  var LOTE = 10, PAR = 3, pend = {}, T = { partidos: 0, kb: 0, ms: 0, fallos: 0 };
+  var $ = function (id) { return document.getElementById(id); };
+  function api() { return window.bpSegAPI || null; }
+  function falta(id) { try { var s = pbpStore[id]; return !!(s && !Array.isArray(s) && s._remoto && !s.raw); } catch (e) { return false; } }
+  function idsDe(juegos) {
+    var vistos = {}, out = [];
+    (juegos || []).forEach(function (g) {
+      if (!g) return;
+      [g.id, (g.fname && typeof _gameId === 'function') ? _gameId(g.fname) : null].forEach(function (i) { if (i && !vistos[i] && falta(i)) { vistos[i] = 1; out.push(i); } });
+    });
+    return out;
+  }
+  function aplicar(fila) {
+    var txt = LZString.decompressFromBase64(fila.datos); if (!txt) throw new Error('detalle ilegible');
+    var s = pbpStore[fila.partido_id]; if (s && !Array.isArray(s)) s.raw = LZString.compressToUTF16(txt);
+  }
+  async function bajarLote(ids) {
+    var a = api(); if (!a || !a.pedir || !a.id) throw new Error('sin conexión con la base');
+    var t0 = Date.now(), ruta = 'pbp_detalle?liga_id=eq.' + encodeURIComponent(a.id) + '&partido_id=in.(' + ids.map(function (i) { return '"' + i + '"'; }).join(',') + ')&select=partido_id,datos', filas;
+    try { filas = await a.pedir(ruta, 30000); } catch (e) { filas = await a.pedir(ruta, 30000); }   // un reintento
+    (filas || []).forEach(function (f) { T.kb += Math.round((f.datos || '').length / 1024); aplicar(f); });
+    T.partidos += (filas || []).length; T.ms += Date.now() - t0;
+  }
+  // Devuelve una promesa con la lista de ids que no se pudieron bajar ([] = todo bien)
+  function asegurar(ids, prog) {
+    ids = (ids || []).filter(falta);
+    var esperar = [], nuevos = [];
+    ids.forEach(function (i) { if (pend[i]) esperar.push(pend[i]); else nuevos.push(i); });
+    var lotes = []; for (var i = 0; i < nuevos.length; i += LOTE) lotes.push(nuevos.slice(i, i + LOTE));
+    var hechos = 0, fallaron = [];
+    var cola = lotes.slice(), trabajadores = [];
+    var trabajar = async function () {
+      while (cola.length) {
+        var l = cola.shift();
+        try { await bajarLote(l); } catch (e) { fallaron = fallaron.concat(l); T.fallos++; try { console.warn('[BPDet]', e); } catch (_) {} }
+        hechos += l.length; if (prog) prog(hechos, nuevos.length);
+      }
+    };
+    for (var w = 0; w < Math.min(PAR, lotes.length); w++) trabajadores.push(trabajar());
+    var todo = Promise.all(trabajadores).then(function () { nuevos.forEach(function (i) { delete pend[i]; }); return fallaron.concat(nuevos.filter(falta)); });
+    nuevos.forEach(function (i) { pend[i] = todo; });
+    return Promise.all(esperar.concat([todo])).then(function () { return ids.filter(falta); });
+  }
+  // ── Aviso de carga ──
+  var st = document.createElement('style');
+  st.textContent = '#bp-det{position:fixed;left:50%;transform:translateX(-50%);bottom:84px;z-index:9999;background:#0f1f14;color:#e8f5e9;border:1px solid var(--green,#00c853);border-radius:12px;padding:10px 14px;font-size:12.5px;box-shadow:0 6px 24px rgba(0,0,0,.45);max-width:92vw;display:flex;gap:10px;align-items:center}' +
+    '#bp-det button{background:var(--green,#00c853);color:#000;border:0;border-radius:8px;padding:5px 10px;font-weight:700;cursor:pointer}#bp-det.err{border-color:#e08a6a;background:#2a1710}';
+  document.head.appendChild(st);
+  function aviso(txt, err, btn) {
+    var b = $('bp-det'); if (!b) { b = document.createElement('div'); b.id = 'bp-det'; document.body.appendChild(b); }
+    b.className = err ? 'err' : ''; b.innerHTML = '<span></span>'; b.firstChild.textContent = txt;
+    if (btn) { var x = document.createElement('button'); x.textContent = btn[0]; x.onclick = btn[1]; b.appendChild(x); }
+  }
+  function quitar() { var b = $('bp-det'); if (b) b.remove(); }
+  async function conAviso(ids, texto) {
+    if (!ids.length) return [];
+    aviso(texto + ' 0/' + ids.length + '…');
+    var mal = await asegurar(ids, function (h, n) { aviso(texto + ' ' + h + '/' + n + '…'); });
+    if (mal.length) aviso('No se pudo cargar el detalle de ' + mal.length + ' partido' + (mal.length > 1 ? 's' : '') + ' (¿sin conexión?). Se muestra lo que hay.', true, ['Reintentar', function () { conAviso(mal, texto).then(function () { try { refresh(); } catch (e) {} }); }]);
+    else quitar();
+    return mal;
+  }
+  // ── Enganche con la app ──
+  var SIN = { ft: 1, torneo: 1, cfg: 1, hist: 1, tend: 1 };
+  function global() { try { return typeof esVistaGlobal === 'function' && esVistaGlobal(); } catch (e) { return false; } }
+  function envolverSw() {
+    if (window.__bpDetSw || typeof window.sw !== 'function') return;
+    var o = window.sw; window.__bpDetSw = 1;
+    window.sw = function (v) {
+      var self = this, args = arguments, ids = [];
+      try { if (!SIN[v] && !(v === 'home' && global())) ids = idsDe(typeof ag === 'function' ? ag() : []); } catch (e) { ids = []; }
+      if (!ids.length) return o.apply(self, args);
+      var t0 = Date.now();
+      return conAviso(ids, 'Cargando detalle del play-by-play').then(function () {
+        try { console.info('[BPDet] ' + ids.length + ' partidos en ' + (Date.now() - t0) + ' ms (total bajado: ' + T.kb + ' KB)'); } catch (e) {}
+        return o.apply(self, args);
+      });
+    };
+  }
+  function envolverModal(nombre) {
+    var o = window[nombre]; if (typeof o !== 'function' || o.__det) return;
+    var w = function (fname) {
+      var self = this, args = arguments, gid = null;
+      try { gid = typeof _gameId === 'function' ? _gameId(fname) : null; } catch (e) {}
+      if (!gid || !falta(gid)) return o.apply(self, args);
+      return conAviso([gid], 'Cargando el partido').then(function () { return o.apply(self, args); });
+    };
+    w.__det = 1; if (o.__bp) w.__bp = 1; window[nombre] = w;
+  }
+  function iniciar() { envolverSw(); ['verMapaDeTiros', 'exportInformePartido', 'openBSByFname'].forEach(envolverModal); }
+  window.BPDet = { asegurar: asegurar, idsDe: idsDe, falta: falta, stats: T, iniciar: iniciar };
+  iniciar();
+  // los envoltorios de la guardia de solo lectura se instalan después: se reintenta una vez cuando ya está todo armado
+  setTimeout(iniciar, 1500);
 })();
 
 </script>
