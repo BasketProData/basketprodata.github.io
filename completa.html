@@ -38356,6 +38356,14 @@ window.bpGuardia = function(){
   function jugadores() { try { return getAllLeaguePlayers() || []; } catch (e) { return []; } }
   function equipos(js) { var m = {}; js.forEach(function (p) { m[p.teamKey || clave(p.team)] = p.team; }); return Object.keys(m).map(function (k) { return { k: k, n: m[k] }; }).sort(function (a, b) { return a.n.localeCompare(b.n); }); }
   function foto(nombre) { try { return (typeof playerPhotos !== 'undefined' && playerPhotos && playerPhotos[nombre]) || ''; } catch (e) { return ''; } }
+  function norm(n) { var t = String(n || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z ,]/g, ' ').split(','); var a = (t[0] || '').trim().split(/\s+/)[0] || '', i = ((t[1] || '').trim()[0]) || ''; return a + '|' + i; }
+  function dorsal(p) {
+    try {
+      if (window.BPFotos && BPFotos.dorsal) { var d = BPFotos.dorsal(p.name, p.team); if (d) return String(d); }
+      var D = (cfgData && cfgData.dorsales) || {}; if (D[p.name] != null && D[p.name] !== '') return String(D[p.name]);
+      var k = norm(p.name), h = Object.keys(D).filter(function (x) { return norm(x) === k && D[x] !== ''; })[0]; return h ? String(D[h]) : '';
+    } catch (e) { return ''; }
+  }
   function escudo(nombre) {
     try { var L = cfgData.teamLogos || {}, k = clave(nombre); if (L[nombre]) return L[nombre]; var h = Object.keys(L).filter(function (t) { return clave(t) === k; })[0]; return h ? L[h] : ''; } catch (e) { return ''; }
   }
@@ -38403,6 +38411,8 @@ window.bpGuardia = function(){
     o += '<rect x="90" y="120" width="620" height="620" rx="26" fill="#0e151c" stroke="' + acento + '" stroke-width="5"/>';
     if (ft) o += imagen(ft, 90, 120, 620, 620, 'cf');
     else o += txt(400, 520, (p.name || '?').trim()[0] || '?', 300, acento, 800, 'middle', ' opacity=".35"');
+    var dz = dorsal(p);
+    if (dz) { var bw = 70 + String(dz).length * 50; o += '<path d="M116 120 H' + (90 + bw) + ' a26 26 0 0 1 0 0 V190 a26 26 0 0 1 -26 26 H90 V146 a26 26 0 0 1 26 -26 Z" fill="' + acento + '"/>' + txt(90 + bw / 2, 192, '#' + dz, 68, '#07110c', 800, 'middle'); }
     if (esc_) o += '<circle cx="400" cy="868" r="106" fill="#0e151c" stroke="' + acento + '" stroke-width="4"/>' + imagen(esc_, 300, 768, 200, 200, 'ce');
     o += txt(790, 170, String(p.team || '').toUpperCase(), 38, acento, 800, 'start', ' letter-spacing="3"');
     var nm = String(p.name || '').toUpperCase(), tam = Math.max(56, Math.min(118, Math.floor(1060 / (nm.length * 0.66))));
