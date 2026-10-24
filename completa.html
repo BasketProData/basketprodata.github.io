@@ -38836,6 +38836,127 @@ window.bpGuardia = function(){
   if (!envolver()) setTimeout(envolver, 500);
 })();
 
+/* Informe de partido · arreglos de nombres y textos.
+ * 1) Play-by-play guardado en "Vista general": el análisis quedó con "Vista general" como nombre de uno de los equipos
+ *    (gráfico del partido, tramo por tramo, parciales). Se corrige con los equipos reales del partido.
+ * 2) La clave "El Nº cuarto marcó el partido — nuestro Sin etiquetar dio N pts" ya no nombra "Sin etiquetar" como si fuera un jugador.
+ * 3) El bloque viejo "Acciones ofensivas" (Prom. = puntos/posibles, confuso) se quita cuando ya está la tabla por jugada y cuarto. */
+(function () {
+  'use strict';
+  function igual(x, y) { try { return typeof teamNameMatch === 'function' ? !!teamNameMatch(x, y) : String(x).toUpperCase() === String(y).toUpperCase(); } catch (e) { return false; } }
+  function arreglarNombres() {
+    var cambio = 0;
+    try {
+      if (typeof leagueGames === 'undefined' || typeof pbpStore === 'undefined' || typeof _gameId !== 'function') return 0;
+      leagueGames.forEach(function (g) {
+        var A = g && g.teamA, B = g && g.teamB; if (!A || !B) return;
+        var st = pbpStore[_gameId(g.fname)]; if (!st || !st._procesado || !st.a) return;
+        var a = st.a, nl = a.nombreLocal, nv = a.nombreVisita;
+        var lA = igual(nl, A), lB = igual(nl, B), vA = igual(nv, A), vB = igual(nv, B);
+        var okL = lA !== lB, okV = vA !== vB;
+        if (okL && okV && lA !== vA) return;                       // ya están bien
+        if (okV && !okL) { a.nombreLocal = vA ? B : A; cambio++; }  // el local quedó con un nombre que no es de ninguno
+        else if (okL && !okV) { a.nombreVisita = lA ? B : A; cambio++; }
+      });
+      if (cambio && typeof autoSave === 'function') { try { autoSave(); } catch (e) {} }
+    } catch (e) { console.warn('bp nombres pbp:', e); }
+    return cambio;
+  }
+  window.bpArreglarNombresPbp = arreglarNombres;
+
+  function envolver() {
+    var ok = true;
+    if (typeof window.exportInformePartido === 'function' && !window.exportInformePartido.__bpn) {
+      var o = window.exportInformePartido;
+      window.exportInformePartido = function (fname) {
+        arreglarNombres();
+        var g = null; try { g = leagueGames.find(function (x) { return x.fname === fname; }); } catch (e) {}
+        var oe = window.exportBaseHTML, puesto = false;
+        // el título del informe usa el nombre del archivo; si el número de fecha del archivo quedó viejo, se muestra el real
+        if (g && g.fecha != null && typeof oe === 'function' && !oe.__bpf) {
+          window.exportBaseHTML = function (t) {
+            var a = arguments;
+            try { if (typeof t === 'string' && t === 'Informe — ' + fname) { a = Array.prototype.slice.call(arguments); a[0] = t.replace(/^(Informe — )Fecha\s*\d+/, '$1Fecha ' + g.fecha); } } catch (e) {}
+            return oe.apply(this, a);
+          };
+          window.exportBaseHTML.__bpf = 1; puesto = true;
+        }
+        try { return o.apply(this, arguments); } finally { if (puesto) window.exportBaseHTML = oe; }
+      };
+      window.exportInformePartido.__bpn = 1;
+    } else if (typeof window.exportInformePartido !== 'function') ok = false;
+    if (typeof window._htmlClavesPartido === 'function' && !window._htmlClavesPartido.__bpn) {
+      var oc = window._htmlClavesPartido;
+      window._htmlClavesPartido = function (claves, gano) {
+        try {
+          claves = (claves || []).map(function (c) {
+            if (c && typeof c.txt === 'string') c = Object.assign({}, c, { txt: c.txt.replace(/\s+—\s+(?:nuestro|su)\s+(?:Sin etiquetar|Dobles|Triples) dio \d+ pts/i, '') });
+            return c;
+          });
+        } catch (e) {}
+        return oc.call(this, claves, gano);
+      };
+      window._htmlClavesPartido.__bpn = 1;
+    } else if (typeof window._htmlClavesPartido !== 'function') ok = false;
+    if (typeof window._normalizarEstilosInforme === 'function' && !window._normalizarEstilosInforme.__bpn) {
+      var on = window._normalizarEstilosInforme;
+      window._normalizarEstilosInforme = function (h) {
+        try {
+          if (typeof h === 'string' && h.indexOf('Puntos por jugada y por cuarto') >= 0)
+            h = h.replace(/<h2[^>]*>\s*Acciones ofensivas\s*<\/h2>[\s\S]*?<\/table>/, '');
+        } catch (e) {}
+        return on.call(this, h);
+      };
+      window._normalizarEstilosInforme.__bpn = 1;
+    } else if (typeof window._normalizarEstilosInforme !== 'function') ok = false;
+    return ok;
+  }
+  if (!envolver()) setTimeout(envolver, 600);
+  setTimeout(arreglarNombres, 2500);
+  if (typeof window.switchLeague === 'function' && !window.switchLeague.__bpn) {
+    var os = window.switchLeague;
+    window.switchLeague = function () { var r = os.apply(this, arguments); setTimeout(arreglarNombres, 2500); return r; };
+    window.switchLeague.__bpn = 1;
+  }
+})();
+
+/* Informe de partido · "Cómo se obtuvieron los puntos": los tiros de campo sin tipo de jugada se separan en Dobles y Triples
+ * (en vez de un solo "Sin etiquetar"), así se ve cuántos puntos vinieron de 2, de 3 y de libres. */
+(function () {
+  'use strict';
+  var FG = /^CANASTA-(2P|3P)$/;
+  function envolver() {
+    if (typeof window._pbpAnalisisCuartos !== 'function') return false;
+    if (window._pbpAnalisisCuartos.__bpdt) return true;
+    var o = window._pbpAnalisisCuartos;
+    window._pbpAnalisisCuartos = function (eventos, lado, ventana) {
+      try {
+        eventos = (eventos || []).map(function (e) {
+          if (e && !e.accion && FG.test(e.tipo || '')) return Object.assign({}, e, { accion: e.tipo === 'CANASTA-3P' ? 'Triples' : 'Dobles' });
+          return e;
+        });
+      } catch (x) {}
+      return o.call(this, eventos, lado, ventana);
+    };
+    window._pbpAnalisisCuartos.__bpdt = 1; return true;
+  }
+  function envolverHtml() {
+    if (typeof window._htmlCuartosYCierres !== 'function') return false;
+    if (window._htmlCuartosYCierres.__bpdt) return true;
+    var o = window._htmlCuartosYCierres;
+    window._htmlCuartosYCierres = function () {
+      var h = o.apply(this, arguments);
+      try {
+        h = h.replace(/Jugadas según el Tablero PBP \("Sin etiquetar" = [^)]*\)\./, 'Los números son puntos. «Dobles» y «Triples» = tiros de campo que no traen tipo de jugada en el Tablero PBP; el resto son jugadas etiquetadas.');
+      } catch (x) {}
+      return h;
+    };
+    window._htmlCuartosYCierres.__bpdt = 1; return true;
+  }
+  if (!envolver()) setTimeout(envolver, 600);
+  if (!envolverHtml()) setTimeout(envolverHtml, 600);
+})();
+
 </script>
  box deducido</div>
 </body>
