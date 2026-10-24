@@ -38779,6 +38779,63 @@ window.bpGuardia = function(){
   if (!envolver()) setTimeout(envolver, 500);
 })();
 
+/* ── Informe de partido: puntos por jugada y por cuarto, desde las Acciones de juego (app externa / Tablero Acciones) ──
+ * Si el partido tiene acciones cargadas (con parciales por cuarto), el informe suma una tabla por equipo con
+ * cómo se hicieron los puntos en cada cuarto. Funciona con o sin play-by-play y también en el paquete VIP de la app pública. */
+(function () {
+  'use strict';
+  var G = '#1b7a3d', R = '#c0392b';
+  function h(s) { return (typeof escHtml === 'function') ? escHtml(String(s == null ? '' : s)) : String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function cl(x) { try { return claveEquipo(x); } catch (e) { return String(x || '').toUpperCase().trim(); } }
+  function mismo(a, b) { a = cl(a); b = cl(b); return !!a && !!b && (a === b || a.indexOf(b) >= 0 || b.indexOf(a) >= 0); }
+  function tabla(nombre, filas, color) {
+    var hayQ = filas.some(function (r) { return r.q; });
+    var cats = [], porCat = {};
+    filas.forEach(function (r) { if (!porCat[r.cat]) { porCat[r.cat] = []; cats.push(r.cat); } porCat[r.cat].push(r); });
+    var sumar = function (rs) { var o = { q: [0, 0, 0, 0], pts: 0, i: 0 }; rs.forEach(function (r) { for (var k = 0; k < 4; k++) o.q[k] += r.q ? r.q[k] : 0; o.pts += r.pts; o.i += r.i; }); return o; };
+    var celdas = function (o) { return (hayQ ? o.q.map(function (v) { return '<td>' + (v || '·') + '</td>'; }).join('') : '') + '<td style="font-weight:800">' + o.pts + '</td><td>' + (o.i || '—') + '</td><td style="font-weight:800;color:' + (o.i ? (o.pts / o.i >= .5 ? G : (o.pts / o.i < .4 ? R : '#333')) : '#bbb') + '">' + (o.i ? Math.round(100 * o.pts / o.i) + '%' : '—') + '</td>'; };
+    var body = '';
+    cats.forEach(function (c) {
+      var rs = porCat[c], tot = sumar(rs); if (!tot.pts && !tot.i) return;
+      var visibles = rs.filter(function (r) { return r.pts || r.i; });
+      if (visibles.length <= 1) { body += '<tr><td style="text-align:left;font-weight:700">' + h(visibles.length ? (visibles[0].sub && visibles[0].sub !== c ? c + ' · ' + visibles[0].sub : c) : c) + '</td>' + celdas(tot) + '</tr>'; return; }
+      body += '<tr style="background:#f4f7f5"><td style="text-align:left;font-weight:800">' + h(c) + '</td>' + celdas(tot) + '</tr>';
+      visibles.forEach(function (r) { body += '<tr><td style="text-align:left;padding-left:22px;color:#555">↳ ' + h(r.sub) + '</td>' + celdas({ q: r.q || [0, 0, 0, 0], pts: r.pts, i: r.i }) + '</tr>'; });
+    });
+    var T = sumar(filas);
+    body += '<tr style="background:#eef6f0;font-weight:800;border-top:2px solid ' + color + '"><td style="text-align:left">Total en acciones</td>' + celdas(T) + '</tr>';
+    return '<h3 style="font-size:10.5pt;margin:12px 0 4px;color:' + color + '">' + h(nombre) + '</h3><table><thead><tr><th style="text-align:left">Jugada</th>' + (hayQ ? '<th>1° C</th><th>2° C</th><th>3° C</th><th>4° C</th>' : '') + '<th>Pts</th><th>Posibles</th><th>Efec.</th></tr></thead><tbody>' + body + '</tbody></table>';
+  }
+  function filasDe(rows) {
+    return (rows || []).map(function (r) {
+      var pts = (typeof _accPtsFila === 'function') ? _accPtsFila(r) : (+r.pts || 0), pc = r.porCuarto;
+      return { cat: r.cat || r.sub || '', sub: r.sub || r.cat || '', pts: pts, i: +r.i || 0, q: pc ? ['c1', 'c2', 'c3', 'c4'].map(function (k) { return pc[k] ? (+pc[k].a || 0) : 0; }) : null };
+    }).filter(function (r) { return r.pts || r.i; });
+  }
+  function html(g, fname, miNombre, rivalNombre) {
+    var gAg = (typeof ag === 'function' ? ag() : []).find(function (x) { return x.fname === fname; }) || g;
+    var ent = (typeof _accEntradasPorJuego === 'function') ? _accEntradasPorJuego([gAg])[0] : null, d = ent && ent.d;
+    if (!d || d._origenPbp) return '';           // las acciones sacadas del propio PBP ya están en "Puntos por tipo de jugada"
+    var soyRival = mismo(miNombre, d.rival);      // el archivo se cargó desde el otro equipo: lo propio es "rv"
+    var mias = filasDe(soyRival ? d.rv : d.vm), suyas = filasDe(soyRival ? d.vm : d.rv);
+    if (!mias.length && !suyas.length) return '';
+    return '<h2>Puntos por jugada y por cuarto <span style="font-size:8pt;font-weight:500;color:#999">· Acciones de juego</span></h2>'
+      + (mias.length ? tabla(miNombre, mias, G) : '') + (suyas.length ? tabla(rivalNombre, suyas, R) : '')
+      + '<div style="font-size:7.5pt;color:#999;margin:4px 0 12px">Cada columna de cuarto son los puntos convertidos con esa jugada. «Posibles» = puntos que se buscaron con ella (2 por tiro de dos, 3 por triple). Los libres y otros puntos que no pasan por una jugada no están en este total.</div>';
+  }
+  function envolver() {
+    if (typeof window._htmlPuntosPorAccion !== 'function' || window._htmlPuntosPorAccion.__acc) return false;
+    var o = window._htmlPuntosPorAccion;
+    window._htmlPuntosPorAccion = function (g, fname, esBoxLocal, vmJug, rvJug, miNombre, rivalNombre) {
+      var extra = ''; try { extra = html(g, fname, miNombre, rivalNombre); } catch (e) { console.warn('acciones por cuarto en informe:', e); }
+      var base = ''; try { base = o.apply(this, arguments); } catch (e) { console.warn(e); }
+      return extra + base;
+    };
+    window._htmlPuntosPorAccion.__acc = 1; return true;
+  }
+  if (!envolver()) setTimeout(envolver, 500);
+})();
+
 </script>
  box deducido</div>
 </body>
