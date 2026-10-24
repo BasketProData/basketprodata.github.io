@@ -3061,6 +3061,14 @@ function _htmlClavesPartido(claves, gano) {
   </div>`;
 }
 
+function _filaOtrosQuintetos(todos, mostrados) {
+  const set = new Set((mostrados || []).map(q => q.lineup));
+  const resto = (todos || []).filter(q => !set.has(q.lineup));
+  if (!resto.length) return '';
+  const minResto = resto.reduce((s, q) => s + q.min, 0), minTot = (todos || []).reduce((s, q) => s + q.min, 0);
+  return `<tr style="color:#666"><td style="text-align:left;font-style:italic">Otros ${resto.length} quintetos (poco tiempo cada uno)</td><td>${minResto.toFixed(1)}</td><td colspan="4"></td></tr>`
+    + `<tr style="font-weight:800;border-top:2px solid #6a4c93"><td style="text-align:left">Total en cancha</td><td>${minTot.toFixed(1)}</td><td colspan="4"></td></tr>`;
+}
 function exportInformePartido(fname) {
   const g = leagueGames.find(x => x.fname === fname);
   if (!g) { if (typeof toast==='function') toast('No encontré ese partido.'); return; }
@@ -3250,7 +3258,7 @@ function exportInformePartido(fname) {
 
         const bloqueEquipo = (rol, nombreEquipo) => {
           const quintetos = acQ.quintetos(rol).filter(q => q.min >= 1);
-          const onOff = acQ.onOff(rol).filter(o => o.onMin >= 1 && o.offMin >= 1);
+          const onOff = acQ.onOff(rol).filter(o => o.onMin > 0);
           if (!quintetos.length && !onOff.length) return '';
 
           const rk = _rankQuintetos(quintetos, _QUINTETO_MIN_PARTIDO);
@@ -3275,12 +3283,12 @@ function exportInformePartido(fname) {
               <th style="text-align:left;padding:4px 6px;color:${P}">Quinteto</th>
               <th style="padding:4px 6px;color:#666">Min</th><th style="padding:4px 6px;color:#666">OER</th>
               <th style="padding:4px 6px;color:#666">DER</th><th style="padding:4px 6px;color:#666">NET</th><th style="padding:4px 6px;color:#666">Imp</th>
-            </tr></thead><tbody>${filasQ}</tbody></table>` : '';
+            </tr></thead><tbody>${filasQ}${_filaOtrosQuintetos(acQ.quintetos(rol), quintetos.slice(0,6))}</tbody></table>` : '';
 
-          const filasOO = onOff.slice().sort((a,b)=>Math.abs(b.diff)-Math.abs(a.diff)).slice(0,8).map(o => `<tr>
+          const filasOO = onOff.slice().sort((a,b)=>b.onMin-a.onMin).map(o => `<tr>
             <td style="text-align:left">${nombreCorto(acQ.nombreDe(rol, o.num))}</td>
             <td>${o.onMin.toFixed(1)}</td>
-            <td style="font-weight:700;color:${colSigno(o.diff)}">${(o.diff>0?'+':'')+Math.round(o.diff)}</td>
+            ${(o.onMin < 1 || o.offMin < 1) ? '<td style="color:#999">—</td>' : `<td style="font-weight:700;color:${colSigno(o.diff)}">${(o.diff>0?'+':'')+Math.round(o.diff)}</td>`}
           </tr>`).join('');
           const tablaOO = filasOO ? `<div style="font-size:9pt;font-weight:700;margin-top:12px;margin-bottom:2px">Con él en cancha vs afuera</div>
             <table style="width:100%;border-collapse:collapse;font-size:8.5pt">
@@ -3288,7 +3296,7 @@ function exportInformePartido(fname) {
                 <th style="text-align:left;padding:4px 6px;color:${P}">Jugador</th>
                 <th style="padding:4px 6px;color:#666">Min</th><th style="padding:4px 6px;color:#666">Impacto (/40)</th>
               </tr></thead><tbody>${filasOO}</tbody></table>
-              <div style="font-size:7.5pt;color:#999;margin-top:3px">Diferencia de rendimiento del equipo (NET cada 40 min) con el jugador adentro comparado con afuera.</div>` : '';
+              <div style="font-size:7.5pt;color:#999;margin-top:3px">Diferencia de rendimiento del equipo (NET cada 40 min) con el jugador adentro comparado con afuera. «—» = jugó menos de 1 minuto o casi todo el partido: no hay con qué comparar.</div>` : '';
 
           return `<div style="flex:1;min-width:280px">
             <div style="font-size:10pt;font-weight:800;color:${G};margin-bottom:6px">${escHtml(nombreEquipo)}</div>
@@ -5732,7 +5740,7 @@ function pbpConstruirBoxScore(eventos, durCuarto) {
     if (!e.jugador && !e.numero) return;
     const t = e.tipo || '';
     // Saltar los cambios (no son estadística de box).
-    if (/CAMBIO-JUGADOR/.test(t)) return;
+    if (/CAMBIO-JUGADOR/.test(t)) { if (t === 'CAMBIO-JUGADOR-ENTRA') filaDe(e); return; }
     const f = filaDe(e);
     if (t === 'CANASTA-2P') { f.TC2m++; f.TC2i++; f.PTS += 2; }
     else if (t === 'TIRO2-FALLADO') { f.TC2i++; }
@@ -38862,6 +38870,39 @@ window.bpGuardia = function(){
     } catch (e) { console.warn('bp nombres pbp:', e); }
     return cambio;
   }
+  // Box armado desde el PBP en partidos ya cargados: suma a quien entró (según los cambios) y no tenía ninguna acción.
+  function arreglarBox() {
+    var cambio = 0;
+    try {
+      if (typeof leagueGames === 'undefined' || typeof pbpEventosCrudos !== 'function' || typeof pbpLineups !== 'function' || typeof _gameId !== 'function') return 0;
+      var norm = function (s) { return String(s || '').toUpperCase().replace(/\s+/g, ' ').trim(); };
+      leagueGames.forEach(function (g) {
+        if (!g || g._boxOrigen !== 'pbp' || g._bpEntraron || !g.playersA || !g.playersA.length || !g.playersB || !g.playersB.length) return;
+        var ev = pbpEventosCrudos(_gameId(g.fname)); if (!ev || !ev.length) return;
+        var lu = pbpLineups(ev, 10), nuevos = 0;
+        ['local', 'visitante'].forEach(function (eq) {
+          var gente = lu.onOff(eq).map(function (o) { return { n: norm(lu.nombreDe(eq, o.num)), min: o.onMin, num: o.num }; }).filter(function (x) { return x.n && x.n.charAt(0) !== '#'; });
+          var cnt = function (arr) { return gente.filter(function (x) { return arr.some(function (p) { return norm(p.N) === x.n; }); }).length; };
+          var cA = cnt(g.playersA), cB = cnt(g.playersB); if (!cA && !cB) return;
+          var lista = cA >= cB ? g.playersA : g.playersB;
+          if (eq === 'visitante' && lista === g._bpUsada) return;
+          gente.forEach(function (x) {
+            if (x.min <= 0 || lista.some(function (p) { return norm(p.N) === x.n; })) return;
+            var t = lista[0], fila = {};
+            Object.keys(t).forEach(function (k) { fila[k] = typeof t[k] === 'number' ? 0 : (typeof t[k] === 'boolean' ? false : (k === '_eq' ? t[k] : (t[k] && typeof t[k] === 'object' ? t[k] : ''))); });
+            fila.N = x.n; fila.MIN = +x.min.toFixed(1); if ('numero' in fila) fila.numero = x.num;
+            lista.push(fila); nuevos++;
+          });
+        });
+        g._bpEntraron = 1; cambio += nuevos;
+      });
+      if (cambio && typeof autoSave === 'function') { try { autoSave(); } catch (e) {} }
+    } catch (e) { console.warn('bp box pbp:', e); }
+    return cambio;
+  }
+  window.bpArreglarBoxPbp = arreglarBox;
+  var _arrN = arreglarNombres;
+  arreglarNombres = function () { var r = _arrN(); arreglarBox(); return r; };
   window.bpArreglarNombresPbp = arreglarNombres;
 
   function envolver() {
