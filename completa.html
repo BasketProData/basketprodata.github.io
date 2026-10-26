@@ -9812,7 +9812,8 @@ function _htmlTablaEquiposAvz() {
 }
 
 function rAv() {
-  const vm=getVM(), rv=getRV(); if(!vm.length) return;
+  ['cFF','cEf','cScatter','cEfgTov'].forEach(id => { try { dc(id); } catch(e){} });
+  const vm=getVM(), rv=getRV(); if(!vm.length) { const _k = document.getElementById('av-kpis'); if (_k) _k.innerHTML = ''; return; }
   const a=adv(vm,rv);
   const kpis=document.getElementById('av-kpis'); kpis.innerHTML='';
   const n = sg().length || 1;
@@ -25542,6 +25543,7 @@ loadLeagueRegistry();
 
 // Resetea TODO el estado en memoria (sin tocar localStorage)
 function resetInMemoryState() {
+  try { Object.keys(charts).forEach(k => { try { charts[k].destroy(); } catch(e){} delete charts[k]; }); } catch(e) {}
   // Invalidar la caché de estadísticas SIEMPRE que se cambia de contexto (liga).
   // Es una salvaguarda dura: sin importar si la "huella" de la caché distingue
   // bien o no entre ligas, esto garantiza que nunca sobreviva un cambio de liga.
