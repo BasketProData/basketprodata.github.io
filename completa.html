@@ -36781,7 +36781,18 @@ window.bpGuardia = function(){
 
   var lista = jp(ls(K_LISTA), []);      // [{k, lid, name, team, nota, visto}]
   var snap = jp(ls(K_SNAP), {});        // {lid: {n, u, t, T:{tid:{n,o}}, j:{k:{team, g:[líneas]}}, err}}
-  function guardar() { lsSet(K_LISTA, JSON.stringify(lista)); lsSet(K_SNAP, JSON.stringify(snap)); }
+  var K_FOTOS = 'bp_seg_fotos_v1';
+  var fotos = jp(ls(K_FOTOS), {});      // {k: foto} — la foto de cada seguido, guardada aparte para verse aunque la liga activa sea otra
+  function guardar() { lsSet(K_LISTA, JSON.stringify(lista)); lsSet(K_SNAP, JSON.stringify(snap)); lsSet(K_FOTOS, JSON.stringify(fotos)); }
+  function juntarFotos(segs, ph) {
+    if (!ph || typeof ph !== 'object') return;
+    var ks = Object.keys(ph);
+    segs.forEach(function (s) {
+      var u = ph[s.name];
+      if (!u) { var k2 = ks.filter(function (n) { return mismoJug(s.name, n); })[0]; u = k2 ? ph[k2] : ''; }
+      if (u) fotos[s.k] = u;
+    });
+  }
 
   // ───────────── identificar al mismo jugador aunque el nombre venga distinto ("JASEN, JOAQUIN HERNAN" ~ "JASEN, J") ─────────────
   function partes(n) {
@@ -36820,7 +36831,7 @@ window.bpGuardia = function(){
   }
   var cacheCaja = {};
   function fuente(lid) {          // {juegos, cfg} o null si no se puede leer sin red
-    if (lid === idActual()) return { juegos: (typeof leagueGames !== 'undefined' ? leagueGames : []) || [], cfg: (typeof cfgData !== 'undefined' ? cfgData : {}) || {} };
+    if (lid === idActual()) return { juegos: (typeof leagueGames !== 'undefined' ? leagueGames : []) || [], cfg: (typeof cfgData !== 'undefined' ? cfgData : {}) || {}, fotos: (typeof playerPhotos !== 'undefined' ? playerPhotos : null) };
     if (PUB) return null;
     if (cacheCaja[lid]) return cacheCaja[lid];
     try {
@@ -36829,7 +36840,7 @@ window.bpGuardia = function(){
       var t = alm.getItem(lid === 'default' ? base : base + '_lg_' + lid);
       var raw = t ? JSON.parse(t) : null;
       if (!raw) return null;
-      return (cacheCaja[lid] = { juegos: raw.leagueGames || [], cfg: raw.cfgData || {} });
+      return (cacheCaja[lid] = { juegos: raw.leagueGames || [], cfg: raw.cfgData || {}, fotos: raw.playerPhotos || null });
     } catch (e) { return null; }
   }
   function torneos(cfg) {
@@ -36888,7 +36899,7 @@ window.bpGuardia = function(){
       var lids = {}; lista.forEach(function (s) { lids[s.lid] = 1; });
       for (var lid in lids) {
         var segs = segsDe(lid), f = fuente(lid);
-        if (f) { aplicar(lid, extraer(f.juegos, f.cfg, segs), (PUB && window.bpSegAPI && lid === window.bpSegAPI.id) ? window.bpSegAPI.act : ''); continue; }
+        if (f) { aplicar(lid, extraer(f.juegos, f.cfg, segs), (PUB && window.bpSegAPI && lid === window.bpSegAPI.id) ? window.bpSegAPI.act : ''); juntarFotos(segs, f.fotos); if (snap[lid]) snap[lid].fv = 1; continue; }
         if (!PUB || !window.bpSegAPI || !window.bpSegAPI.pedir) continue;
         try {
           var cab = await window.bpSegAPI.pedir('cajas?liga_id=eq.' + encodeURIComponent(lid) + '&select=actualizado', 8000);
@@ -36896,11 +36907,11 @@ window.bpGuardia = function(){
           if (!act) { snap[lid] = Object.assign(snap[lid] || { T: {}, j: {} }, { err: 'Sin acceso a esta liga (no está en tu suscripción o no se publicó).' }); continue; }
           var cs = snap[lid];
           var faltan = segs.some(function (s) { return !cs || !cs.j || !cs.j[s.k]; });
-          if (!forzar && cs && cs.u === act && !faltan) { delete cs.err; continue; }
+          if (!forzar && cs && cs.u === act && !faltan && cs.fv) { delete cs.err; continue; }
           var fila = await window.bpSegAPI.pedir('cajas?liga_id=eq.' + encodeURIComponent(lid) + '&select=datos,actualizado', 25000);
           if (!fila || !fila[0] || !fila[0].datos) continue;
           var caja = JSON.parse(LZString.decompressFromBase64(fila[0].datos));
-          aplicar(lid, extraer(caja.leagueGames || [], caja.cfgData || {}, segs), fila[0].actualizado);
+          aplicar(lid, extraer(caja.leagueGames || [], caja.cfgData || {}, segs), fila[0].actualizado); juntarFotos(segs, caja.playerPhotos); if (snap[lid]) snap[lid].fv = 1;
         } catch (e) { if (snap[lid]) snap[lid].err = 'Sin conexión: se muestran los últimos datos guardados.'; }
       }
       guardar();
@@ -36943,7 +36954,7 @@ window.bpGuardia = function(){
   function hue(n) { return Math.abs(String(n).split('').reduce(function (h, c) { return h + c.charCodeAt(0); }, 0)) % 360; }
   function iniciales(n) { return String(n).split(',').map(function (x) { return x.trim()[0]; }).filter(Boolean).slice(0, 2).join('').toUpperCase(); }
   function avatar(s, px) {
-    var foto = (typeof playerPhotos !== 'undefined' && s.lid === idActual() && playerPhotos[s.name]) ? playerPhotos[s.name] : '';
+    var foto = (typeof playerPhotos !== 'undefined' && s.lid === idActual() && playerPhotos[s.name]) ? playerPhotos[s.name] : (fotos[s.k] || '');
     var h = hue(s.name);
     return foto ? '<img src="' + esc(foto) + '" style="width:' + px + 'px;height:' + px + 'px;border-radius:50%;object-fit:cover;border:2px solid var(--green)">'
       : '<div style="width:' + px + 'px;height:' + px + 'px;border-radius:50%;background:hsl(' + h + ',50%,25%);border:2px solid hsl(' + h + ',60%,40%);display:flex;align-items:center;justify-content:center;font-size:' + Math.round(px * .3) + 'px;font-weight:800;color:#fff;flex-shrink:0">' + esc(iniciales(s.name)) + '</div>';
@@ -37194,7 +37205,7 @@ window.bpGuardia = function(){
       var s = porK(k); if (!s) return;
       if (!confirm('¿Dejar de seguir a ' + corto(s.name) + '?')) return;
       lista = lista.filter(function (x) { return x.k !== k; });
-      var d = snap[s.lid]; if (d && d.j) delete d.j[k];
+      var d = snap[s.lid]; if (d && d.j) delete d.j[k]; delete fotos[k];
       guardar(); if (volver) ST.vista = 'lista'; render(); estrellas();
     },
     actualizar: async function () {
@@ -37214,7 +37225,7 @@ window.bpGuardia = function(){
     },
     sigue: function (name, lid) { lid = lid || idActual(); return lista.some(function (s) { return s.lid === lid && mismoJug(s.name, name); }); },
     abrirSeccion: function () { if (typeof sw === 'function') sw('seg'); },
-    limpiarDatos: function () { snap = {}; try { localStorage.removeItem(K_SNAP); } catch (e) { } },
+    limpiarDatos: function () { snap = {}; fotos = {}; try { localStorage.removeItem(K_SNAP); localStorage.removeItem(K_FOTOS); } catch (e) { } },
     _estado: function () { return { lista: lista, snap: snap, ST: ST }; }
   };
   window.BPSeg = API;
