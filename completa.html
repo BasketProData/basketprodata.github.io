@@ -9990,6 +9990,14 @@ function diagnosticarPlantilla() {
 // ═══════════════════════════════════════════════════════════════════════════
 // JUGADORES
 // ═══════════════════════════════════════════════════════════════════════════
+function _bpDorsalTxt(nombre) {
+  try {
+    if (!window.BPFotos || typeof BPFotos.dorsal !== 'function') return '';
+    const eq = (typeof esVistaGlobal === 'function' && esVistaGlobal()) ? '' : activeTeamName();
+    const d = BPFotos.dorsal(nombre, eq);
+    return (d != null && d !== '') ? '<b style="color:var(--green);font-weight:800;margin-right:4px">#' + String(d).replace(/[<>&"]/g, '') + '</b>' : '';
+  } catch (e) { return ''; }
+}
 function rJug() {
   const players=getPlayers();
   if (jMode === 'sem') {
@@ -10054,7 +10062,7 @@ function rJug() {
   filtered.forEach(p=>{
     const d=jMode==='acum'?p.acum:p.prom;
     h+='<tr>'+cols.map(c=>{
-      if(c==='name'){const {pos1,pos2}=getPlayerPosition(p.name);const posLabel=pos1?(POS_SHORT[pos1]||pos1)+(pos2?'/'+POS_SHORT[pos2]:''):'';return `<td class="td-n"><span onclick="openPerfDetail(this.getAttribute('data-pname'))" data-pname="${p.name}" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px" title="Ver perfil">${sn(p.name)}</span>${posLabel?`<span style="font-size:9px;padding:1px 5px;border-radius:10px;margin-left:4px;background:var(--green)22;color:var(--green)">${posLabel}</span>`:''}</td>`;}
+      if(c==='name'){const {pos1,pos2}=getPlayerPosition(p.name);const posLabel=pos1?(POS_SHORT[pos1]||pos1)+(pos2?'/'+POS_SHORT[pos2]:''):'';return `<td class="td-n"><span onclick="openPerfDetail(this.getAttribute('data-pname'))" data-pname="${p.name}" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px" title="Ver perfil">${_bpDorsalTxt(p.name)}${sn(p.name)}</span>${posLabel?`<span style="font-size:9px;padding:1px 5px;border-radius:10px;margin-left:4px;background:var(--green)22;color:var(--green)">${posLabel}</span>`:''}</td>`;}
       if(c==='PM'){const v=p.prom.PM;return `<td style="color:${v>0?'var(--green)':v<0?'var(--red)':'#666'}">${v>0?'+'+v:v}</td>`;}
       if(c==='bpm'){if(d.bpm===null||d.bpm===undefined)return '<td style="color:var(--text3)" title="Muestra insuficiente (menos de 40 min)">—</td>';const v=d.bpm||0;return `<td style="font-weight:700;color:${v>2?'var(--green)':v<-2?'var(--red)':'var(--text3)'}">${v>0?'+'+v:v}</td>`;}
       if(c==='perAdv'){if(d.perAdv===null||d.perAdv===undefined)return '<td style="color:var(--text3)" title="Muestra insuficiente (menos de 40 min)">—</td>';const v=d.perAdv||0;return `<td style="color:${v>15?'var(--green)':v<8?'var(--red)':'var(--text3)'}">${v}</td>`;}
