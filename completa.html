@@ -31534,7 +31534,7 @@ function claveEquipo(nombre) {
   return (nombre||'')
     .toUpperCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-    .replace(/^\s*\d+\s*[°ºªO]?\s*[-.)]?\s*/,'')  // "1º ", "3 - ", "10) "
+    .replace(/^\s*\d+\s*(?:[°ºª]\s*[-.)]?|[-.)])\s*/,'')  // "1º ", "3 - ", "10) " (no "9 DE JULIO")
     .replace(/[.,;:_]/g,' ')
     .replace(/\s+/g,' ')
     .trim();
@@ -31553,7 +31553,7 @@ function abrevDe(nombre) {
 
 function nombreClubLimpio(nombre) {
   return (nombre||'')
-    .replace(/^\s*\d+\s*[°ºªo]?\s*[-.)]?\s*/i,'')
+    .replace(/^\s*\d+\s*(?:[°ºª]\s*[-.)]?|[-.)])\s*/,'')
     .replace(/[.,;:_]+\s*$/,'')
     .replace(/\s+/g,' ')
     .trim();
@@ -35962,6 +35962,31 @@ window.bpGuardia = function(){
   envolverSVG('_sitStripFactores', svgFactores);
   window.BPEscudos = { decorar: decorar, decorarHtml: decorarHtml, procesarHtml: procesarHtml, logoDe: logoDe };
   if (document.body) enganchar(); else document.addEventListener('DOMContentLoaded', enganchar);
+
+  // Migración: antes "9 DE JULIO" se guardaba/mostraba como "DE JULIO" (se perdía el número inicial) y el escudo quedó
+  // bajo ese nombre. Si hay un club con número inicial sin escudo y uno guardado con su nombre sin el número, se lo copia.
+  function migrarLogosNumero() {
+    try {
+      var L = (typeof cfgData !== 'undefined' && cfgData && cfgData.teamLogos) || null; if (!L) return;
+      var nombres = {}, add = function (n) { if (n && /^\s*\d+\s+[^\d\s°ºª.)-]/.test(n)) nombres[String(n).trim()] = 1; };
+      try { (typeof _getAllLeaguePlayersUncached === 'function' ? _getAllLeaguePlayersUncached() : []).forEach(function (p) { add(p.team); }); } catch (e) {}
+      try { (typeof leagueGames !== 'undefined' ? leagueGames : []).forEach(function (g) { add(g.teamA); add(g.teamB); add(g.rival); }); } catch (e) {}
+      var cambio = false, ks = Object.keys(L), cl = function (x) { return String(x || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[.,;:_]/g, ' ').replace(/\s+/g, ' ').trim(); };
+      Object.keys(nombres).forEach(function (T) {
+        if (L[T] || ks.some(function (k) { return cl(k) === cl(T); })) return;
+        var sin = cl(T.replace(/^\s*\d+\s+/, ''));
+        var k = ks.filter(function (x) { return L[x] && cl(x) === sin; })[0];
+        if (k) { L[T] = L[k]; cambio = true; }
+      });
+      if (cambio && typeof autoSave === 'function') { try { autoSave(); } catch (e) {} }
+    } catch (e) {}
+  }
+  (function () {
+    var n = 0, t = setInterval(function () { if (window.bpArrancado || ++n > 60) { clearInterval(t); migrarLogosNumero(); } }, 500);
+    if (typeof window.switchLeague === 'function' && !window.switchLeague.__migLogo) {
+      var sl = window.switchLeague; window.switchLeague = function () { var r = sl.apply(this, arguments); setTimeout(migrarLogosNumero, 600); return r; }; window.switchLeague.__migLogo = 1;
+    }
+  })();
 })();
 
 </script>
@@ -38577,9 +38602,10 @@ window.bpGuardia = function(){
     if (dz) { var bw = 70 + String(dz).length * 50; o += '<path d="M' + (90 + 26) + ' ' + fy + ' H' + (90 + bw) + ' V' + (fy + 70) + ' a26 26 0 0 1 -26 26 H90 V' + (fy + 26) + ' a26 26 0 0 1 26 -26 Z" fill="' + acento + '"/>' + txt(90 + bw / 2, fy + 72, '#' + dz, 68, '#07110c', 800, 'middle'); }
     if (esc_ && abajo) o += '<circle cx="400" cy="868" r="106" fill="#0e151c" stroke="' + acento + '" stroke-width="4"/>' + imagen(esc_, 300, 768, 200, 200, 'ce');
     if (esc_ && modo === 'arriba') o += '<circle cx="1790" cy="104" r="76" fill="#0e151c" stroke="' + acento + '" stroke-width="4"/>' + imagen(esc_, 1720, 34, 140, 140, 'cu');
-    o += txt(790, 170, String(p.team || '').toUpperCase(), 38, acento, 800, 'start', ' letter-spacing="3"');
-    var nm = String(p.name || '').toUpperCase(), tam = Math.max(56, Math.min(118, Math.floor(1060 / (nm.length * 0.66))));
-    o += txt(790, 170 + tam + 14, nm, tam, c, 800, 'start', sombra());
+    var tq = String(p.team || '').toUpperCase(), tf = ajuste(tq, 880, 38);   // nombre completo del club (ej. "9 DE JULIO"), se achica si es largo
+    o += txt(790, 170, tq, tf.sz, acento, 800, 'start', ' letter-spacing="3"' + tf.ex);
+    var nm = String(p.name || '').toUpperCase(), tam = Math.max(40, Math.min(118, Math.floor(1030 / (nm.length * 0.66))));
+    o += txt(790, 170 + tam + 14, nm, tam, c, 800, 'start', sombra() + (nm.length * 0.66 * tam > 1060 ? ' textLength="1030" lengthAdjust="spacingAndGlyphs"' : ''));
     var sub = [nombreLiga(), temporada()].filter(Boolean).join(' · ') + ' · ' + p._n + ' PJ';
     o += txt(790, 170 + tam + 62, sub, 32, c2, 500, 'start', sombra());
     var mp = S.mapa === 'si' ? mapaDe(p) : null, car = String(carGet(p) || '').trim();
