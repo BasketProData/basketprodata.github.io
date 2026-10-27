@@ -39166,6 +39166,24 @@ window.bpGuardia = function(){
   if (!envolverHtml()) setTimeout(envolverHtml, 600);
 })();
 
+// ── Público: la pestaña Playoffs del torneo sólo aparece si la liga publicó playoffs (el admin lo habilita por liga) ──
+(function () {
+  if (typeof BP_PUBLICO === 'undefined' || !BP_PUBLICO) return;
+  function hay() {
+    try {
+      if (cfgData.playoffs) return true;
+      var m = cfgData.playoffsPorTorneo; if (m && Object.keys(m).some(function (k) { return m[k]; })) return true;
+      return (leagueGames || []).some(function (g) { return g && g.isPlayoff; });
+    } catch (e) { return false; }
+  }
+  function aplicar() {
+    var b = document.getElementById('torneo-tab-play'), h = hay();
+    if (b) b.style.display = h ? '' : 'none';
+    if (!h && typeof torneoTabMode !== 'undefined' && torneoTabMode === 'playoffs' && typeof setTorneoTab === 'function') { try { setTorneoTab('tabla'); } catch (e) {} }
+  }
+  setInterval(aplicar, 700);
+})();
+
 </script>
  box deducido</div>
 </body>
