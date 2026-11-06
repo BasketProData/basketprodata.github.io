@@ -20965,6 +20965,7 @@ function _dorsalDeJugador(nombre) {
     if (typeof pbpEventosCrudos !== 'function') return null;
     const ape = _normNombreJug(nombre).split(/[\s,]+/)[0];
     if (!ape || ape.length < 3) return null;
+    const pilaN = (typeof _mjNombrePila === 'function') ? _mjNombrePila(nombre) : '';
     const cuenta = {};
     const juegos = (typeof getTorneoGamesAll === 'function') ? getTorneoGamesAll() : (leagueGames || []);
     juegos.forEach(g => {
@@ -20973,6 +20974,7 @@ function _dorsalDeJugador(nombre) {
       (pbpEventosCrudos(gid) || []).forEach(e => {
         if (!e.numero || !e.jugador) return;
         if (_normNombreJug(e.jugador).split(/[\s,]+/)[0] !== ape) return;
+        if (pilaN && typeof _mjNombrePila === 'function') { const pe = _mjNombrePila(e.jugador); if (pe && !_mjPilaOk(pe, pilaN)) return; }
         cuenta[e.numero] = (cuenta[e.numero] || 0) + 1;
       });
     });
