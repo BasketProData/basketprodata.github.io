@@ -20686,12 +20686,15 @@ function _mjTirosPbp(j, equipo, clave, grupo, cache, ctx) {
   });
   return { zonas, conCoord, sinCoord, hayTags };
 }
-function _mjManual(fname, clave, ctx) {
-  if (ctx) return null;   // con homónimos la carga manual (guardada por apellido) no se puede atribuir
+function _mjManual(fname, clave, ctx, nombre) {
   const st = (typeof shotMapStore !== 'undefined') ? shotMapStore['_zj_' + fname] : null;
   if (!st) return null;
-  const k = Object.keys(st).find(x => _mjCoincide(x, clave));
-  return k ? st[k] : null;
+  const pila = _mjNombrePila(nombre);   // con homónimos hay una entrada por persona (clave "APELLIDO ~NOMBRE"): se toma la de ESTA persona
+  const ks = Object.keys(st).filter(x => _mjCoincide(x, clave));
+  const ok = ks.filter(x => { const pe = _mjNombrePila((st[x] || {}).n); return !pila || !pe || _mjPilaOk(pe, pila); });
+  if (!ok.length) return null;
+  if (pila) { const ex = ok.find(x => _mjNombrePila((st[x] || {}).n)); if (ex) return st[ex]; }
+  return ctx ? null : st[ok[0]];
 }
 function _mjSumaZonas(z) { let m = 0, i = 0; Object.values(z || {}).forEach(d => { m += d.m || 0; i += d.i || 0; }); return { m, i }; }
 
@@ -20710,7 +20713,7 @@ function _mjAnalizar(st) {
     if (pbpTodos && pbpTodos.hayTags) hayTags = true;
     let fuente = null, zonas = null, ubicados = 0;
     if (pbpTodos && pbpTodos.conCoord > 0) { fuente = 'pbp'; zonas = pbp ? pbp.zonas : {}; ubicados = pbpTodos.conCoord; }
-    else { const man = _mjManual(j.fname, st.clave, ctx); if (man) { fuente = 'manual'; zonas = st.jugada ? null : man.z; ubicados = _mjSumaZonas(man.z).i; if (st.jugada) excluidosManual++; } }
+    else { const man = _mjManual(j.fname, st.clave, ctx, st.nombre); if (man) { fuente = 'manual'; zonas = st.jugada ? null : man.z; ubicados = _mjSumaZonas(man.z).i; if (st.jugada) excluidosManual++; } }
     return Object.assign({}, j, { box, fuente, zonas, ubicados, sinCoord: pbpTodos ? pbpTodos.sinCoord : 0, sel: st.sel.has(j.fname) });
   });
   filas.forEach(f => {
@@ -20840,7 +20843,7 @@ function _mjHtmlVista() {
 // ── Carga manual de un partido ──
 function _mjEditar(fname) {
   const j = _mjJuegosDe(_mj.equipo, _mj.clave).find(x => x.fname === fname); if (!j) return;
-  const previo = _mjManual(fname, _mj.clave);
+  const previo = _mjManual(fname, _mj.clave, null, _mj.nombre);
   const z = {}; ZONAS_CARGA.forEach(Z => z[Z.k] = { m: previo && previo.z[Z.k] ? previo.z[Z.k].m : 0, i: previo && previo.z[Z.k] ? previo.z[Z.k].i : 0 });
   _mj.editando = fname; _mj.ed = { z, hay: !!previo, j };
   _mjRender();
