@@ -20603,6 +20603,37 @@ var _MJ_ZONAS_PINTURA = ['aro', 'cerca_sup', 'cerca_cen', 'cerca_inf'];
 function _mjClave(n) { return (typeof _claveJugadorPbp === 'function') ? _claveJugadorPbp(n) : String(n || '').split(',')[0].trim().toUpperCase(); }
 // "BOLLO" y "BOLLO SUAREZ" son el mismo jugador (según el archivo viene con el apellido completo o no).
 function _mjCoincide(a, b) { return !!a && !!b && (a === b || a.indexOf(b + ' ') === 0 || b.indexOf(a + ' ') === 0); }
+// Primer nombre de pila (o inicial) de "APELLIDO, NOMBRE ..." / "APELLIDO N". '' si sólo viene el apellido.
+function _mjNombrePila(n) {
+  let s = String(n || '').trim(); if (!s) return '';
+  s = s.normalize ? s.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : s; s = s.toUpperCase();
+  if (s.indexOf(',') >= 0) return (s.split(',').slice(1).join(' ').replace(/[^A-Z ]/g, ' ').trim().split(/\s+/)[0]) || '';
+  const m = /^[A-Z0-9Ñ ]*?\s([A-Z])\.?$/.exec(s.replace(/[^A-Z0-9Ñ. ]/g, ' ').replace(/\s+/g, ' ').trim()); return m ? m[1] : '';
+}
+function _mjPilaOk(a, b) { return !!a && !!b && (a.indexOf(b) === 0 || b.indexOf(a) === 0); }
+// Si en ese equipo hay dos jugadoras/es con el mismo apellido, devuelve el contexto para distinguirlas; si no, null.
+function _mjCtx(equipo, clave, nombre) {
+  try {
+    const pila = _mjNombrePila(nombre); if (!pila || !equipo) return null;
+    const juegos = (typeof getTorneoGamesAll === 'function') ? getTorneoGamesAll() : (leagueGames || []);
+    const grupos = [];
+    juegos.forEach(g => {
+      let lado = null; if (teamNameMatch(g.teamA, equipo)) lado = 'A'; else if (teamNameMatch(g.teamB, equipo)) lado = 'B'; if (!lado) return;
+      ((lado === 'A' ? g.playersA : g.playersB) || []).forEach(p => {
+        if (!_mjCoincide(_mjClave(p.N), clave)) return;
+        const pl = _mjNombrePila(p.N); if (!pl) return;
+        if (!grupos.some(x => _mjPilaOk(x, pl))) grupos.push(pl);
+      });
+    });
+    return grupos.length > 1 ? { pila } : null;
+  } catch (e) { return null; }
+}
+// ¿Este nombre (de box o de PBP) es el jugador buscado? Con homónimos exige el nombre de pila (o la inicial).
+function _mjEs(n, clave, ctx) {
+  if (!_mjCoincide(_mjClave(n), clave)) return false;
+  if (!ctx) return true;
+  return _mjPilaOk(_mjNombrePila(n), ctx.pila);
+}
 
 function _mjJugadoresLiga() {
   try { return _infGetJugadoresLiga().filter(j => j.pg >= 1); } catch (e) { return []; }
@@ -20611,15 +20642,15 @@ function _mjEsPropio(equipo) {
   try { return teamNameMatch(equipo, activeTeamName()) || teamNameMatch(equipo, cfgData.teamName || ''); } catch (e) { return false; }
 }
 // Partidos del torneo donde jugó el equipo del jugador, con su fila de box score.
-function _mjJuegosDe(equipo, clave) {
-  const out = [];
+function _mjJuegosDe(equipo, clave, nombre) {
+  const out = [], ctx = _mjCtx(equipo, clave, nombre);
   const juegos = (typeof getTorneoGamesAll === 'function') ? getTorneoGamesAll() : (leagueGames || []);
   juegos.forEach(g => {
     let lado = null;
     if (teamNameMatch(g.teamA, equipo)) lado = 'A'; else if (teamNameMatch(g.teamB, equipo)) lado = 'B';
     if (!lado) return;
     const filas = (lado === 'A' ? g.playersA : g.playersB) || [];
-    const fila = filas.filter(p => (p.MIN || 0) > 0 || (p.TC2i || 0) + (p.TC3i || 0) > 0).find(p => _mjCoincide(_mjClave(p.N), clave));
+    const fila = filas.filter(p => (p.MIN || 0) > 0 || (p.TC2i || 0) + (p.TC3i || 0) > 0).find(p => _mjEs(p.N, clave, ctx));
     const rival = lado === 'A' ? g.teamB : g.teamA;
     const sc = lado === 'A' ? [g.scoreA, g.scoreB] : [g.scoreB, g.scoreA];
     const n = _fechaNum(g);
@@ -20630,7 +20661,7 @@ function _mjJuegosDe(equipo, clave) {
   return out.sort((x, y) => x._n - y._n);
 }
 // Tiros del jugador en el PBP de un partido (con coordenadas), por zona.
-function _mjTirosPbp(j, equipo, clave, grupo, cache) {
+function _mjTirosPbp(j, equipo, clave, grupo, cache, ctx) {
   const gid = _gameId(j.fname);
   if (!pbpTieneDatos(gid)) return null;
   let ev = cache[gid];
@@ -20644,7 +20675,7 @@ function _mjTirosPbp(j, equipo, clave, grupo, cache) {
   ev.forEach(e => {
     if (e.equipo !== ladoJug) return;
     if (!/^(CANASTA-[23]P|TIRO[23]-FALLADO)$/.test(e.tipo || '')) return;
-    if (!_mjCoincide(_mjClave(e.jugador), clave)) return;
+    if (!_mjEs(e.jugador, clave, ctx)) return;
     if (e.accion) hayTags = true;
     if (grupo && _grupoJugada(e.accion) !== grupo) return;
     if (e.x == null || e.y == null) { sinCoord++; return; }
@@ -20655,7 +20686,8 @@ function _mjTirosPbp(j, equipo, clave, grupo, cache) {
   });
   return { zonas, conCoord, sinCoord, hayTags };
 }
-function _mjManual(fname, clave) {
+function _mjManual(fname, clave, ctx) {
+  if (ctx) return null;   // con homónimos la carga manual (guardada por apellido) no se puede atribuir
   const st = (typeof shotMapStore !== 'undefined') ? shotMapStore['_zj_' + fname] : null;
   if (!st) return null;
   const k = Object.keys(st).find(x => _mjCoincide(x, clave));
@@ -20666,18 +20698,19 @@ function _mjSumaZonas(z) { let m = 0, i = 0; Object.values(z || {}).forEach(d =>
 // Datos de cada partido + total de los seleccionados.
 function _mjAnalizar(st) {
   const cache = st.cacheEv || (st.cacheEv = {});
-  const juegos = _mjJuegosDe(st.equipo, st.clave);
+  const ctx = _mjCtx(st.equipo, st.clave, st.nombre);
+  const juegos = _mjJuegosDe(st.equipo, st.clave, st.nombre);
   const total = {};
   ZONAS_CARGA.forEach(Z => total[Z.k] = { m:0, i:0 });
   let hayTags = false, excluidosManual = 0;
   const filas = juegos.map(j => {
     const box = j.fila ? { i: (j.fila.TC2i || 0) + (j.fila.TC3i || 0), m: (j.fila.TC2m || 0) + (j.fila.TC3m || 0) } : null;
-    const pbp = _mjTirosPbp(j, st.equipo, st.clave, st.jugada, cache);
-    const pbpTodos = st.jugada ? _mjTirosPbp(j, st.equipo, st.clave, '', cache) : pbp;
+    const pbp = _mjTirosPbp(j, st.equipo, st.clave, st.jugada, cache, ctx);
+    const pbpTodos = st.jugada ? _mjTirosPbp(j, st.equipo, st.clave, '', cache, ctx) : pbp;
     if (pbpTodos && pbpTodos.hayTags) hayTags = true;
     let fuente = null, zonas = null, ubicados = 0;
     if (pbpTodos && pbpTodos.conCoord > 0) { fuente = 'pbp'; zonas = pbp ? pbp.zonas : {}; ubicados = pbpTodos.conCoord; }
-    else { const man = _mjManual(j.fname, st.clave); if (man) { fuente = 'manual'; zonas = st.jugada ? null : man.z; ubicados = _mjSumaZonas(man.z).i; if (st.jugada) excluidosManual++; } }
+    else { const man = _mjManual(j.fname, st.clave, ctx); if (man) { fuente = 'manual'; zonas = st.jugada ? null : man.z; ubicados = _mjSumaZonas(man.z).i; if (st.jugada) excluidosManual++; } }
     return Object.assign({}, j, { box, fuente, zonas, ubicados, sinCoord: pbpTodos ? pbpTodos.sinCoord : 0, sel: st.sel.has(j.fname) });
   });
   filas.forEach(f => {
@@ -38549,10 +38582,10 @@ window.bpGuardia = function(){
   function mapaDe(p) {
     try {
       if (typeof _mjAnalizar !== 'function' || typeof _svgMapaZonasDe !== 'function' || typeof _mjJuegosDe !== 'function') return null;
-      var cl = _mjClave(p.name), js = _mjJuegosDe(p.team, cl).filter(function (j) { return j.fila; });
+      var cl = _mjClave(p.name), js = _mjJuegosDe(p.team, cl, p.name).filter(function (j) { return j.fila; });
       if (S.ult > 0) js = js.slice(-S.ult);
       if (!js.length) return null;
-      var a = _mjAnalizar({ equipo: p.team, clave: cl, jugada: '', sel: new Set(js.map(function (j) { return j.fname; })), cacheEv: {} });
+      var a = _mjAnalizar({ equipo: p.team, nombre: p.name, clave: cl, jugada: '', sel: new Set(js.map(function (j) { return j.fname; })), cacheEv: {} });
       var t = _mjSumaZonas(a.total); if (!t.i) return null;
       var h = _svgMapaZonasDe(a.total, '', '', { ancho: 320, imprimible: true });
       var m = /<svg[^>]*viewBox="([^"]+)"[^>]*>([\s\S]*)<\/svg>/.exec(h); if (!m) return null;
