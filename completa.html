@@ -3932,7 +3932,30 @@ const f1s  = v => { const r=f1(v); return (r>0?'+':'')+r; }; // signed
 // mismo jugador llega como "BRUNI, T." o "Bruni, Tomás". Solo cambia lo que se
 // ve; las claves internas (fotos, disponibilidad, etc.) siguen usando el nombre
 // tal como está guardado.
-const sn   = n => String(n == null ? '' : n).split(',')[0].toUpperCase();
+
+let _bpHomC = { k: '', s: null };
+function _bpHom() {
+  try {
+    const J = (typeof leagueGames !== 'undefined' && leagueGames) ? leagueGames : [];
+    const k = J.length + '|' + (J.length ? J[J.length - 1].fname : '');
+    if (_bpHomC.s && _bpHomC.k === k) return _bpHomC.s;
+    const pilaDe = n => { const r = String(n).split(',').slice(1).join(' ').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Z ]/g, ' ').trim().split(/\s+/)[0] || ''; return r; };
+    const grupos = {};
+    J.forEach(g => { [['teamA', 'playersA'], ['teamB', 'playersB']].forEach(([t, pl]) => {
+      (g[pl] || []).forEach(p => { const n = String((p && p.N) || '').toUpperCase().trim(); if (n.indexOf(',') < 1) return;
+        const key = String(g[t]).toUpperCase() + '|' + n.split(',')[0].trim();
+        (grupos[key] = grupos[key] || new Set()).add(n); }); }); });
+    const set = new Set();
+    Object.keys(grupos).forEach(key => { const ns = [...grupos[key]]; const pil = ns.map(pilaDe).filter(Boolean); let amb = false;
+      for (let i = 0; i < pil.length && !amb; i++) for (let j = i + 1; j < pil.length; j++) { const a = pil[i], b = pil[j]; if (!(a.indexOf(b) === 0 || b.indexOf(a) === 0)) { amb = true; break; } }
+      if (amb) ns.forEach(n => set.add(n)); });
+    _bpHomC = { k, s: set }; return set;
+  } catch (e) { return new Set(); }
+}
+const sn   = n => { const s = String(n == null ? '' : n), u = s.split(',')[0].toUpperCase();
+  if (s.indexOf(',') > 0 && _bpHom().has(s.toUpperCase().trim())) { const m = /[A-ZÁÉÍÓÚÑ]/i.exec(s.split(',').slice(1).join(' ').trim()); if (m) return u + ' ' + m[0].toUpperCase() + '.'; }
+  return u; };
+
 // Mini avatar de jugador (foto si la hay; si no, sus iniciales). badge = emoji chico en la esquina (para alertas).
 function _bpAv(n, s, badge) {
   s = s || 22;
