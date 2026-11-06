@@ -3933,6 +3933,17 @@ const f1s  = v => { const r=f1(v); return (r>0?'+':'')+r; }; // signed
 // ve; las claves internas (fotos, disponibilidad, etc.) siguen usando el nombre
 // tal como está guardado.
 const sn   = n => String(n == null ? '' : n).split(',')[0].toUpperCase();
+// Mini avatar de jugador (foto si la hay; si no, sus iniciales). badge = emoji chico en la esquina (para alertas).
+function _bpAv(n, s, badge) {
+  s = s || 22;
+  let ph = ''; try { ph = (typeof playerPhotos !== 'undefined' && playerPhotos && playerPhotos[n]) || ''; } catch (e) {}
+  const pt = String(n || '').split(','), ini = ((pt[0] || '').trim()[0] || '') + ((pt[1] || '').trim()[0] || '');
+  const base = 'width:' + s + 'px;height:' + s + 'px;border-radius:50%;flex-shrink:0;border:1px solid var(--border2);box-sizing:border-box';
+  const core = ph ? '<img src="' + String(ph).replace(/"/g, '&quot;') + '" alt="" loading="lazy" style="' + base + ';object-fit:cover;object-position:center 18%;background:var(--bg3);display:block">'
+    : '<span style="' + base + ';display:inline-flex;align-items:center;justify-content:center;background:var(--bg3);color:var(--text3);font-size:' + Math.max(8, Math.round(s * 0.38)) + 'px;font-weight:700">' + ini.replace(/</g, '&lt;') + '</span>';
+  if (!badge) return core;
+  return '<span style="position:relative;display:inline-block;flex-shrink:0;line-height:0">' + core + '<span style="position:absolute;right:-4px;bottom:-4px;font-size:' + Math.max(9, Math.round(s * 0.42)) + 'px;line-height:1;background:var(--card,#fff);border-radius:50%;padding:1px">' + badge + '</span></span>';
+}
 // Igual que sn(), pero agrega la inicial del nombre cuando el apellido
 // coincide con el rival actual (para no leer "ALEM" y pensar que es del rival
 // en un informe "vs Alem", cuando en realidad es un jugador propio).
@@ -9411,7 +9422,7 @@ function rHome() {
         <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">A controlar</div>
         ${topRv.map((p,i)=>`<div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0;border-bottom:0.5px solid var(--border)">
           <div style="display:flex;align-items:center;gap:6px">
-            <span style="font-size:14px">${i===0?'🔴':i===1?'🟠':'🟡'}</span>
+            ${_bpAv(p.name,28,i===0?'🔴':i===1?'🟠':'🟡')}
             <span style="color:var(--text);font-weight:600">${sn(p.name)}</span>
           </div>
           <div style="display:flex;gap:8px;font-size:10px;color:var(--text3)">
@@ -9450,7 +9461,7 @@ function rHome() {
       ${top5min.map(p => {
         const pct = Math.round(p.avgMin / Math.max(maxMIN,1) * 100);
         return `<div style="display:flex;align-items:center;gap:8px">
-          <span style="width:80px;font-size:11px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0">${sn(p.name)}</span>
+          ${_bpAv(p.name,24)}<span style="width:70px;font-size:11px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0">${sn(p.name)}</span>
           <div style="flex:1;background:var(--bg3);border-radius:3px;height:8px;overflow:hidden">
             <div style="height:8px;border-radius:3px;background:var(--green);width:${pct}%;transition:width .3s"></div>
           </div>
@@ -9501,17 +9512,17 @@ function rHome() {
       // Racha negativa VAL
       const played = valid.slice(-3);
       if (played.length === 3 && played.every(r => r.VAL < avgVAL4))
-        playerAlerts.push({icon:'📉',title:`${sn(p.name)}: racha negativa VAL (últimos 3 bajo promedio)`,lvl:'red'});
+        playerAlerts.push({pn:p.name,icon:'📉',title:`${sn(p.name)}: racha negativa VAL (últimos 3 bajo promedio)`,lvl:'red'});
       // Más pérdidas que asistencias
       const avgAST = f1(valid.reduce((s,r)=>s+(r.AST||0),0)/valid.length);
       const avgPER = f1(valid.reduce((s,r)=>s+(r.PER||0),0)/valid.length);
       if (avgPER > avgAST && avgPER >= 1.5)
-        playerAlerts.push({icon:'🔄',title:`${sn(p.name)}: más pérdidas que asistencias en ${label4}`,lvl:'orange'});
+        playerAlerts.push({pn:p.name,icon:'🔄',title:`${sn(p.name)}: más pérdidas que asistencias en ${label4}`,lvl:'orange'});
       // %TL bajo
       const tlI4 = valid.reduce((s,r)=>s+(r.TLi||0),0);
       const tlM4 = valid.reduce((s,r)=>s+(r.TLm||0),0);
       if (tlI4 >= 4 && pc(tlM4,tlI4) < 60)
-        playerAlerts.push({icon:'🏀',title:`${sn(p.name)}: %TL ${pc(tlM4,tlI4)}% en ${label4}`,lvl:'orange'});
+        playerAlerts.push({pn:p.name,icon:'🏀',title:`${sn(p.name)}: %TL ${pc(tlM4,tlI4)}% en ${label4}`,lvl:'orange'});
     });
   }
 
@@ -9528,7 +9539,7 @@ function rHome() {
     </div>
     ${allAlerts.length ? allAlerts.map(a=>`
       <div style="display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:0.5px solid var(--border)">
-        <span style="font-size:18px;flex-shrink:0">${a.icon}</span>
+        ${a.pn ? _bpAv(a.pn,30,a.icon) : `<span style="font-size:18px;flex-shrink:0">${a.icon}</span>`}
         <div>
           <div style="font-size:11px;font-weight:700;color:${a.lvl==='red'?'var(--red)':'var(--orange)'}">${a.title}</div>
         </div>
@@ -9703,10 +9714,11 @@ function rEq() {
    ['Visitante',`${visW}V−${visG-visW}D`,'',`${visG} partidos`],
    ['PTS prom.',f1(vmPts/n),'',`rival ${f1(rvPts/n)}`],
    ['PTS total',vmPts,'',`rival ${rvPts}`],
-   ['REB prom.',f1(sp(vm,'REB')/n),'',`total ${sp(vm,'REB')}`],
+   ['REB prom.',f1(sp(vm,'REB')/n),'',`ofens. ${f1(sp(vm,'REB_O')/n)} · defens. ${f1(sp(vm,'REB_D')/n)}`],
    ['AST prom.',f1(sp(vm,'AST')/n),'',`total ${sp(vm,'AST')}`],
    ['%TC2',pc(sp(vm,'TC2m'),sp(vm,'TC2i'))+'%','',`${sp(vm,'TC2m')}/${sp(vm,'TC2i')}`],
    ['%TC3',pc(sp(vm,'TC3m'),sp(vm,'TC3i'))+'%','',`${sp(vm,'TC3m')}/${sp(vm,'TC3i')}`],
+   ['%TL',pc(sp(vm,'TLm'),sp(vm,'TLi'))+'%','',`${sp(vm,'TLm')}/${sp(vm,'TLi')}`],
    ['NET rating',(a.NET>0?'+':'')+a.NET,a.NET>0?'green':'red','OER−DER'],
   ].forEach(([l,v,cls,s])=>kpis.appendChild(kpiEl(l,v,cls,s)));
   const lbs=games.map(gl);
@@ -10039,16 +10051,16 @@ function rJug() {
   document.getElementById('jInfo').textContent=`${filtered.length} jugadores · ${sg().length} fechas`;
   const C={
     prom:{
-      cols:['name','PG','MIN','PTS','REB','AST','REC','PER','TAP','TC2pct','TC3pct','TLpct','VAL','PM'],
-      lbl:{name:'Jugador',PG:'PJ',MIN:'MIN',PTS:'PTS',REB:'REB',AST:'AST',REC:'REC',PER:'PER',TAP:'TAP',
+      cols:['name','PG','MIN','PTS','REB','REB_O','REB_D','AST','REC','PER','TAP','TC2pct','TC3pct','TLpct','VAL','PM'],
+      lbl:{name:'Jugador',PG:'PJ',MIN:'MIN',PTS:'PTS',REB:'REB',REB_O:'RO',REB_D:'RD',AST:'AST',REC:'REC',PER:'PER',TAP:'TAP',
            TC2pct:'%2P',TC3pct:'%3P',TLpct:'%TL',
            VAL:'VAL',PM:'+/-'}
     },
     acum:{
-      cols:['name','PG','MIN','PTS','REB','AST','REC','PER','TAP','TC2m','TC2i','TC3m','TC3i','TLm','TLi','REB_O','REB_D','FC','FR','VAL'],
-      lbl:{name:'Jugador',PG:'PJ',MIN:'MIN',PTS:'PTS',REB:'REB',AST:'AST',REC:'REC',PER:'PER',TAP:'TAP',
+      cols:['name','PG','MIN','PTS','REB','REB_O','REB_D','AST','REC','PER','TAP','TC2m','TC2i','TC3m','TC3i','TLm','TLi','FC','FR','VAL'],
+      lbl:{name:'Jugador',PG:'PJ',MIN:'MIN',PTS:'PTS',REB:'REB',REB_O:'RO',REB_D:'RD',AST:'AST',REC:'REC',PER:'PER',TAP:'TAP',
            TC2m:'2Pm',TC2i:'2Pi',TC3m:'3Pm',TC3i:'3Pi',TLm:'TLm',TLi:'TLi',
-           REB_O:'REB_O',REB_D:'REB_D',FC:'FC',FR:'FR',VAL:'VAL'}
+           FC:'FC',FR:'FR',VAL:'VAL'}
     },
     avz:{
       cols:['name','PG','MIN','eFG','TS','usg','ast','tovPct','orebPct','drebPct','tpar','ftr','perAdv','bpm'],
@@ -37728,6 +37740,13 @@ window.bpGuardia = function(){
         if (/Último partido/i.test(t)) c.remove();
         else if (/Quinteto/i.test(t) && c.children[1]) {
           c.children[1].textContent = c.children[1].textContent.split('·').map(function (s) { s = s.trim().toLowerCase(); return s.replace(/(^|\s)\S/g, function (m) { return m.toUpperCase(); }); }).join(' · ');
+          // fotos de los cinco del quinteto (por apellido)
+          try {
+            var ap = c.children[1].textContent.split('·').map(function (x) { return x.trim().toUpperCase(); }), todos = getPlayers(), fila = document.createElement('div');
+            fila.style.cssText = 'display:flex;gap:4px;margin-top:8px;flex-wrap:wrap';
+            ap.forEach(function (a) { var pl = todos.filter(function (p) { return sn(p.name) === a; })[0]; if (pl && typeof _bpAv === 'function') { var w = document.createElement('span'); w.title = pl.name.split(',')[0]; w.innerHTML = _bpAv(pl.name, 34); fila.appendChild(w); } });
+            if (fila.children.length && !c.querySelector('[data-bp-qav]')) { fila.setAttribute('data-bp-qav', '1'); c.appendChild(fila); }
+          } catch (e) {}
         }
       });
       var lab = lect.lastElementChild; if (lab && lab !== lect.children[0] && lab !== lect.children[1]) lab.remove();
@@ -37765,7 +37784,8 @@ window.bpGuardia = function(){
         (top.length ? top.map(function (p, i) {
           var u = ultVal(p, tab), d = u == null ? null : r1(u - p.prom[tab]);
           return '<div class="bi-row" style="gap:10px"><span style="width:16px;color:var(--text3);font-size:11px">' + (i + 1) + '</span>' +
-            '<span style="width:84px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600">' + esc(sn(p.name)) + '</span>' +
+            (typeof _bpAv === 'function' ? _bpAv(p.name, 26) : '') +
+            '<span style="width:72px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600">' + esc(sn(p.name)) + '</span>' +
             '<div class="bi-bar"><i style="width:' + Math.max(4, Math.round(p.prom[tab] / mx * 100)) + '%;background:var(--green)"></i></div>' +
             '<b style="width:38px;text-align:right">' + p.prom[tab] + '</b>' +
             '<span style="width:46px;text-align:right;font-size:10px;color:' + (d == null ? 'var(--text3)' : (d > 0 ? G : (d < 0 ? R : 'var(--text3)'))) + '" title="Promedio en los últimos 4 partidos vs. el total">' + (d == null ? '' : (d > 0 ? '▲' : (d < 0 ? '▼' : '=')) + Math.abs(d)) + '</span></div>';
@@ -39182,6 +39202,95 @@ window.bpGuardia = function(){
     if (!h && typeof torneoTabMode !== 'undefined' && torneoTabMode === 'playoffs' && typeof setTorneoTab === 'function') { try { setTorneoTab('tabla'); } catch (e) {} }
   }
   setInterval(aplicar, 700);
+})();
+
+</script>
+<script id="bp-eqdetalle">
+/* BasketPro · Panel Equipo: tabla de estadísticas detalladas (tiro por tipo, rebotes ofensivos/defensivos, asistencias…)
+   equipo vs. rivales, por partido y total. Se arma con los mismos partidos que el resto del panel. */
+(function () {
+  'use strict';
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  var r1 = function (v) { return (Math.round(v * 10) / 10).toFixed(1); };
+  var pc = function (m, i) { return i > 0 ? Math.round(m / i * 1000) / 10 : null; };
+  var G = 'var(--green)', R = 'var(--red)';
+
+  function fila(vm, rv, n) {
+    var S = function (a, k) { return a.reduce(function (t, p) { return t + (p[k] || 0); }, 0); };
+    var def = function (lab, ks, tipo, bajo) { return { lab: lab, ks: ks, tipo: tipo, bajo: !!bajo }; };
+    var val = function (a, ks) { return ks.reduce(function (t, k) { return t + S(a, k); }, 0); };
+    var defs = [
+      def('Puntos', ['PTS'], 'n'),
+      def('Tiros de campo', ['TC2', 'TC3'], 'tiro'),
+      def('Dobles (2P)', ['TC2'], 'tiro'),
+      def('Triples (3P)', ['TC3'], 'tiro'),
+      def('Tiros libres', ['TL'], 'tiro'),
+      def('Rebotes ofensivos', ['REB_O'], 'n'),
+      def('Rebotes defensivos', ['REB_D'], 'n'),
+      def('Rebotes totales', ['REB'], 'n'),
+      def('Asistencias', ['AST'], 'n'),
+      def('Recuperos', ['REC'], 'n'),
+      def('Pérdidas', ['PER'], 'n', true),
+      def('Tapones', ['TAP'], 'n'),
+      def('Faltas cometidas', ['FC'], 'n', true)
+    ];
+    return defs.map(function (d) {
+      if (d.tipo === 'tiro') {
+        var f = function (a) { var m = val(a, d.ks.map(function (k) { return k + 'm'; })), i = val(a, d.ks.map(function (k) { return k + 'i'; })); return { m: m, i: i }; };
+        var e = f(vm), r = f(rv);
+        return { d: d, tiro: true, e: e, r: r, pe: pc(e.m, e.i), pr: pc(r.m, r.i) };
+      }
+      var e2 = val(vm, d.ks), r2 = val(rv, d.ks);
+      return { d: d, tiro: false, e: e2, r: r2 };
+    });
+  }
+
+  function html() {
+    var games = juegosParaStats(), n = games.length; if (!n) return '';
+    var vm = getVM(), rv = getRV(), rows = fila(vm, rv, n);
+    // si no hay rebotes separados cargados (Excel viejos) no se inventan: se muestra "—"
+    var sinRebSep = !vm.some(function (p) { return (p.REB_O || 0) + (p.REB_D || 0) > 0; });
+    var th = 'padding:6px 8px;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;text-align:right;white-space:nowrap;font-weight:600';
+    var td = 'padding:6px 8px;text-align:right;white-space:nowrap;font-size:12px';
+    var cuerpo = rows.map(function (x) {
+      var sep = (x.d.ks[0] === 'REB_O' || x.d.ks[0] === 'REB_D') && sinRebSep;
+      var pe = x.tiro ? (x.pe == null ? '—' : x.pe + '%') : '', pr = x.tiro ? (x.pr == null ? '—' : x.pr + '%') : '';
+      var pe_ = x.tiro ? r1(x.e.m / n) + '<span style="color:var(--text3)"> / ' + r1(x.e.i / n) + '</span>' : (sep ? '—' : r1(x.e / n));
+      var pr_ = x.tiro ? r1(x.r.m / n) + '<span style="color:var(--text3)"> / ' + r1(x.r.i / n) + '</span>' : (sep ? '—' : r1(x.r / n));
+      var tot = x.tiro ? x.e.m + '/' + x.e.i : (sep ? '—' : x.e);
+      var dif = '', col = 'var(--text3)';
+      if (x.tiro) { if (x.pe != null && x.pr != null) { var dd = Math.round((x.pe - x.pr) * 10) / 10; dif = (dd > 0 ? '+' : '') + dd + ' pts %'; col = dd > 0 ? G : (dd < 0 ? R : col); } }
+      else if (!sep) { var d2 = Math.round((x.e - x.r) / n * 10) / 10; dif = (d2 > 0 ? '+' : '') + r1(d2); var bien = x.d.bajo ? d2 < 0 : d2 > 0, mal = x.d.bajo ? d2 > 0 : d2 < 0; col = bien ? G : (mal ? R : col); }
+      var esTot = /totales|Puntos/.test(x.d.lab);
+      return '<tr style="border-top:1px solid var(--border)' + (esTot ? ';background:rgba(127,127,127,.06)' : '') + '"><td style="padding:6px 8px;font-size:12px;font-weight:' + (esTot ? 700 : 500) + ';white-space:nowrap">' + esc(x.d.lab) + '</td>' +
+        '<td style="' + td + ';font-weight:700">' + pe_ + '</td><td style="' + td + ';color:var(--green);font-weight:700">' + pe + '</td><td style="' + td + ';color:var(--text2)">' + tot + '</td>' +
+        '<td style="' + td + '">' + pr_ + '</td><td style="' + td + ';color:var(--text2)">' + pr + '</td><td style="' + td + ';font-weight:700;color:' + col + '">' + dif + '</td></tr>';
+    }).join('');
+    return '<div class="card-t">📋 Estadísticas detalladas <span style="font-size:10px;font-weight:400;color:var(--text3)">— ' + esc(activeTeamName()) + ' vs. rivales · promedio por partido (' + n + ' PJ)</span></div>' +
+      '<div class="tw" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse"><thead><tr>' +
+      '<th style="' + th + ';text-align:left"></th><th style="' + th + '">Equipo<br>prom. (conv/int)</th><th style="' + th + '">% acierto</th><th style="' + th + '">Total<br>equipo</th>' +
+      '<th style="' + th + '">Rivales<br>prom.</th><th style="' + th + '">% rivales</th><th style="' + th + '">Dif. por<br>partido</th></tr></thead><tbody>' + cuerpo + '</tbody></table></div>' +
+      (sinRebSep ? '<div style="font-size:10px;color:var(--text3);margin-top:6px">Los partidos cargados no traen rebotes separados (ofensivos / defensivos).</div>' : '') +
+      '<div style="font-size:10px;color:var(--text3);margin-top:6px">Verde = ventaja del equipo (en pérdidas y faltas, menos es mejor).</div>';
+  }
+
+  function pintar() {
+    try {
+      var kp = document.getElementById('eq-kpis'); if (!kp) return;
+      var h = html(), c = document.getElementById('bp-eq-det');
+      if (!h) { if (c) c.remove(); return; }
+      if (!c) { c = document.createElement('div'); c.id = 'bp-eq-det'; c.className = 'card'; c.style.marginBottom = '12px'; kp.insertAdjacentElement('afterend', c); }
+      if (c.getAttribute('data-sig') !== h) { c.innerHTML = h; c.setAttribute('data-sig', h); }
+    } catch (e) { try { console.warn('bp_eqdetalle', e); } catch (_) {} }
+  }
+  function envolver() {
+    if (typeof window.rEq !== 'function' || window.rEq.__det) return false;
+    var o = window.rEq;
+    window.rEq = function () { var r = o.apply(this, arguments); pintar(); return r; };
+    window.rEq.__det = 1; return true;
+  }
+  if (!envolver()) { var n = 0, t = setInterval(function () { if (envolver() || ++n > 40) clearInterval(t); }, 300); }
+  window.BPEqDetalle = { pintar: pintar };
 })();
 
 </script>
