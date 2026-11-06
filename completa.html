@@ -1811,6 +1811,7 @@ body.light .hm-cell{border-color:rgba(0,0,0,.1)}
       <button class="btn btn-sm tf-tpl" onclick="tfApplyTemplate('t1bahia')">T1 Bahía</button>
       <button class="btn btn-sm tf-tpl" onclick="tfApplyTemplate('t2bahia')">T2 Bahía</button>
       <button class="btn btn-sm tf-tpl" onclick="tfApplyTemplate('bronce')">Bronce</button>
+      <button class="btn btn-sm tf-tpl" onclick="tfApplyTemplate('larg')" title="Liga Argentina 2026/27: 17 equipos por conferencia, 32 fechas">Liga Argentina</button>
       <button class="btn btn-sm tf-tpl" onclick="tfApplyTemplate('blank')" style="color:var(--text3)">En blanco</button>
     </div>
 
@@ -27994,6 +27995,13 @@ function tfApplyTemplate(tpl) {
     document.getElementById('tf-fechas').value = 11; document.getElementById('tf-arrastre').value = 50;
     tfZonas = [{desde:1,hasta:8,destino:'playoffs'},{desde:9,hasta:10,destino:'vacaciones'},{desde:11,hasta:12,destino:'playout'}];
     setSeries(3,3,3,5,3);
+  } else if (tpl==='larg') {
+    // Liga Argentina 2026/27 (cada conferencia): 17 equipos, ida y vuelta = 32 fechas.
+    // 1°-4° directo a octavos · 5°-12° reclasificación · 13°-16° sin más juego · 17° desciende (sin serie).
+    document.getElementById('tf-nombre').value = 'Fase regular 2026/27';
+    document.getElementById('tf-equipos').value = 17;
+    document.getElementById('tf-fechas').value = 32; document.getElementById('tf-arrastre').value = 0;
+    tfZonas = [{desde:1,hasta:4,destino:'playoffs'},{desde:5,hasta:12,destino:'playin'},{desde:13,hasta:16,destino:'vacaciones'},{desde:17,hasta:17,destino:'playout'}];
   } else if (tpl==='bronce') {
     document.getElementById('tf-nombre').value = 'Bronce';
     document.getElementById('tf-fechas').value = 11; document.getElementById('tf-arrastre').value = 0;
