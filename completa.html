@@ -21693,6 +21693,7 @@ function _htmlTablaPosiciones(equipoDestacado) {
       <td style="padding:5px 8px;text-align:center;${bold}">${pos}</td>
       <td style="padding:5px 8px;${bold}">${esc(t.name)}${nuestro?' ◄':''}</td>
       <td style="padding:5px 8px;text-align:center">${t.wins}-${t.losses}</td>
+      <td style="padding:5px 8px;text-align:center">${t.games ? Math.round(t.wins * 100 / t.games) + '%' : '—'}</td>
       <td style="padding:5px 8px;text-align:center;font-weight:700">${t.pts}</td>
       <td style="padding:5px 8px;text-align:center">${t.ptsFor}</td>
       <td style="padding:5px 8px;text-align:center">${t.ptsAga}</td>
@@ -21708,6 +21709,7 @@ function _htmlTablaPosiciones(equipoDestacado) {
         <th style="padding:5px 8px">#</th>
         <th style="padding:5px 8px;text-align:left">Equipo</th>
         <th style="padding:5px 8px" title="Victorias-Derrotas">V-D</th>
+        <th style="padding:5px 8px" title="Porcentaje de victorias">%V</th>
         <th style="padding:5px 8px" title="Puntos de tabla">Pts</th>
         <th style="padding:5px 8px" title="Puntos a favor por partido">PF</th>
         <th style="padding:5px 8px" title="Puntos en contra por partido">PC</th>
@@ -31270,14 +31272,20 @@ function _getTorneoTeamsUncached() {
   } catch(e) {}
 
   // 1) Ordenar por puntos de tabla (descendente)
-  rows.sort((a,b) => b.pts - a.pts);
+  // Orden de la tabla: % de victoria y después puntos (útil cuando los equipos jugaron distinta cantidad de partidos),
+  // o sólo puntos. Por defecto manda la tabla oficial por puntos.
+  const _tieneArr = rows.some(r => r._arrastre);
+  const _modo = (cfgData.ordenTabla === 'pct') ? 'pct' : 'pts';
+  rows.forEach(r => { r.pctV = r.games ? r.wins / r.games : -1; r._modoOrden = _modo; r._hayArr = _tieneArr; });
+  const _mismoLugar = (x, y) => x.pts === y.pts && (_modo !== 'pct' || x.pctV === y.pctV);
+  rows.sort((a,b) => _modo === 'pct' ? ((b.pctV - a.pctV) || (b.pts - a.pts)) : (b.pts - a.pts));
 
   // 2) Dentro de cada grupo de empatados en puntos, aplicar subtabla
   const result = [];
   let i = 0;
   while(i < rows.length) {
     let j = i;
-    while(j < rows.length && rows[j].pts === rows[i].pts) j++;
+    while(j < rows.length && _mismoLugar(rows[j], rows[i])) j++;
     const group = rows.slice(i, j);
     if(group.length === 1) {
       group[0]._tie = null;
@@ -32391,6 +32399,20 @@ function removeTorneoGame(idx) {
 }
 
 // ── TABLA DE POSICIONES ──────────────────────────────────────────────────────
+var _vistaTab = { col: '', dir: -1 };
+function _flechaV(c) { return _vistaTab.col === c ? (_vistaTab.dir === -1 ? ' ▼' : ' ▲') : ''; }
+function ordenarVistaTabla(col) {
+  if (_vistaTab.col !== col) _vistaTab = { col: col, dir: -1 };
+  else if (_vistaTab.dir === -1) _vistaTab.dir = 1;
+  else _vistaTab = { col: '', dir: -1 };
+  rTorneoTabla();
+}
+function setOrdenTabla(m) {
+  cfgData.ordenTabla = (m === 'pts') ? 'pts' : 'pct';
+  try { _statsCache.torneoTeamsKey = null; } catch (e) {}
+  try { if (typeof autoSave === 'function') autoSave(); } catch (e) {}
+  rTorneoTabla();
+}
 function rTorneoTabla() {
   const el = document.getElementById('torneo-tabla-content');
   if(!el) return;
@@ -32486,29 +32508,40 @@ function rTorneoTabla() {
   el.innerHTML = `
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px;flex-wrap:wrap">
     <span style="font-size:10.5px;color:var(--text3)">Las flechas ▲▼ mueven un equipo de puesto. Sirve para cualquier liga: si el orden automático está bien, no toques nada.</span>
+    ${(typeof BP_PUBLICO !== 'undefined' && BP_PUBLICO) ? '' : `<span style="display:inline-flex;align-items:center;gap:4px;font-size:10.5px;color:var(--text3)">Ordenar por
+      <button class="btn btn-sm" onclick="setOrdenTabla('pct')" style="font-size:10px;${teams[0] && teams[0]._modoOrden==='pct' ? 'background:var(--green);color:#000;border:none;font-weight:700' : ''}">% victoria, luego puntos</button>
+      <button class="btn btn-sm" onclick="setOrdenTabla('pts')" style="font-size:10px;${teams[0] && teams[0]._modoOrden==='pts' ? 'background:var(--green);color:#000;border:none;font-weight:700' : ''}">Puntos</button>
+      ${teams[0] && teams[0]._hayArr && teams[0]._modoOrden==='pct' ? '<span title="El % de victoria no incluye el arrastre de puntos del torneo anterior" style="color:#b7791f">⚠ no incluye arrastre</span>' : ''}</span>`}
     ${teams.some(t=>t._manual) ? '<button class="btn btn-sm" onclick="limpiarOrdenManual()" style="font-size:10px;border-color:var(--border2);color:var(--text3)">Borrar orden manual</button>' : ''}
   </div>
+  ${_vistaTab.col ? '<div style="font-size:10.5px;color:#b7791f;margin-bottom:6px">Vista ordenada por una columna. El número de puesto y la zona siguen siendo los de la tabla oficial (por ' + (teams[0] && teams[0]._modoOrden === 'pct' ? '% de victoria y puntos' : 'puntos') + '). <a href="#" onclick="_vistaTab={col:\'\',dir:-1};rTorneoTabla();return false" style="color:var(--green)">Volver al orden oficial</a></div>' : ''}
   <div style="overflow-x:auto">
   <table style="width:100%;border-collapse:collapse;min-width:520px">
     <thead><tr style="border-bottom:2px solid var(--border)">
       <th style="padding:8px 10px;width:32px;text-align:center;font-size:10px;color:var(--text3)">#</th>
       <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text3)">Equipo</th>
-      <th style="padding:8px 6px;text-align:center;font-size:10px;color:var(--text3)">PJ</th>
-      <th style="padding:8px 6px;text-align:center;font-size:10px;color:var(--green)">G</th>
-      <th style="padding:8px 6px;text-align:center;font-size:10px;color:var(--red)">P</th>
-      <th style="padding:8px 6px;text-align:center;font-size:10px;color:var(--text3)">PF</th>
-      <th style="padding:8px 6px;text-align:center;font-size:10px;color:var(--text3)">PC</th>
-      <th style="padding:8px 6px;text-align:center;font-size:10px;color:var(--text3)">DIF</th>
+      <th onclick="ordenarVistaTabla('pts')" style="cursor:pointer;padding:8px 10px;text-align:center;font-size:10px;font-weight:700;color:var(--green)" title="Puntos de tabla · tocá para ordenar">PTS${_flechaV('pts')}</th>
+      <th onclick="ordenarVistaTabla('pj')" style="cursor:pointer;padding:8px 6px;text-align:center;font-size:10px;color:var(--text3)" title="Partidos jugados · tocá para ordenar">PJ${_flechaV('pj')}</th>
+      <th onclick="ordenarVistaTabla('g')" style="cursor:pointer;padding:8px 6px;text-align:center;font-size:10px;color:var(--green)" title="Ganados · tocá para ordenar">G${_flechaV('g')}</th>
+      <th onclick="ordenarVistaTabla('p')" style="cursor:pointer;padding:8px 6px;text-align:center;font-size:10px;color:var(--red)" title="Perdidos · tocá para ordenar">P${_flechaV('p')}</th>
+      <th onclick="ordenarVistaTabla('pf')" style="cursor:pointer;padding:8px 6px;text-align:center;font-size:10px;color:var(--text3)" title="Puntos a favor por partido · tocá para ordenar">PF${_flechaV('pf')}</th>
+      <th onclick="ordenarVistaTabla('pc')" style="cursor:pointer;padding:8px 6px;text-align:center;font-size:10px;color:var(--text3)" title="Puntos en contra por partido · tocá para ordenar">PC${_flechaV('pc')}</th>
+      <th onclick="ordenarVistaTabla('dif')" style="cursor:pointer;padding:8px 6px;text-align:center;font-size:10px;color:var(--text3)" title="Diferencia · tocá para ordenar">DIF${_flechaV('dif')}</th>
+      <th onclick="ordenarVistaTabla('pct')" style="cursor:pointer;padding:8px 6px;text-align:center;font-size:10px;color:var(--green);font-weight:700" title="Porcentaje de victorias (G / PJ) · tocá para ordenar">%V${_flechaV('pct')}</th>
       <th style="padding:8px 6px;text-align:center;font-size:10px;color:var(--green);border-left:1px solid var(--border)" title="Diferencial en el enfrentamiento directo vs ${activeTeamName()}">vs ${activeTeamName().split(' ')[0]}</th>
-      <th style="padding:8px 10px;text-align:center;font-size:10px;font-weight:700;color:var(--green)">PTS</th>
       <th style="padding:8px 8px;text-align:center;font-size:10px;color:var(--text3)">Últ. 4</th>
       <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text3)">Zona</th>
     </tr></thead>
     <tbody>
-      ${teams.map((t,i)=>{
+      ${(function () {
+        const valV = (t, c) => c === 'pj' ? t.games : c === 'g' ? t.wins : c === 'p' ? t.losses : c === 'pct' ? t.pctV : c === 'pf' ? t.ptsFor : c === 'pc' ? t.ptsAga : c === 'dif' ? t.diff : c === 'pts' ? t.pts : 0;
+        const idx = teams.map((t, i) => ({ t: t, i: i }));
+        if (_vistaTab.col) idx.sort((x, y) => (valV(x.t, _vistaTab.col) - valV(y.t, _vistaTab.col)) * _vistaTab.dir || (x.i - y.i));
+        return idx;
+      })().map(({t,i})=>{
         const col=colMap(i);
         const isActive=t.name.toUpperCase().includes(activeUp.split(' ')[0])||activeUp.includes(t.name.toUpperCase().split(' ')[0]);
-        const sep=i===bypass-1?`border-bottom:2px dashed ${colMap(i)};`:'';
+        const sep=(!_vistaTab.col && i===bypass-1)?`border-bottom:2px dashed ${colMap(i)};`:'';
 
         // H2H diff
         const h2hVal = isActive ? null : getH2H(t.name);
@@ -32528,14 +32561,15 @@ function rTorneoTabla() {
               <span onclick="moverEnTabla(this.getAttribute('data-team'),1)" data-team="${t.name}" title="Bajar un puesto" style="cursor:pointer;padding:0 3px;color:var(--text3);font-size:10px;${i===teams.length-1?'opacity:.15;pointer-events:none':''}">▼</span>
             </span>
           </td>
+          <td style="padding:7px 10px;text-align:center;font-size:16px;font-weight:900;color:var(--text)">${t.pts}${t._arrastre ? ` <span style="font-size:9px;color:var(--green);cursor:help;font-weight:700" title="${t._ptsTorneo} pts de este torneo + ${t._arrastre} arrastrados (${(getActiveTorneo()||{}).arrastrePct||50}% del torneo anterior)">▴${t._arrastre}</span>` : ''}${t._tie ? ` <span style="font-size:10px;color:var(--orange);cursor:help" title="Empate en ${t._tie.pts} pts con ${t._tie.teams} equipos. Desempate por subtabla (head-to-head): diferencia ${t._tie.miniDiff>0?'+':''}${t._tie.miniDiff}, puntos a favor ${t._tie.miniPf}, en los partidos entre: ${t._tie.rivals.join(', ')}.">🔸</span>` : ''}</td>
           <td style="padding:7px 6px;text-align:center;font-size:12px;color:var(--text3)">${t.games}</td>
           <td style="padding:7px 6px;text-align:center;font-size:12px;font-weight:700;color:var(--green)">${t.wins}</td>
           <td style="padding:7px 6px;text-align:center;font-size:12px;font-weight:700;color:var(--red)">${t.losses}</td>
           <td style="padding:7px 6px;text-align:center;font-size:12px;color:var(--text2)">${t.ptsFor}</td>
           <td style="padding:7px 6px;text-align:center;font-size:12px;color:var(--text2)">${t.ptsAga}</td>
           <td style="padding:7px 6px;text-align:center;font-size:12px;color:${t.diff>0?'var(--green)':t.diff<0?'var(--red)':'var(--text3)'}">${t.diff>0?'+':''}${t.diff}</td>
+          <td style="padding:7px 6px;text-align:center;font-size:12px;font-weight:${t._modoOrden==='pct'?700:400};color:var(--text2)">${t.games ? Math.round(t.wins * 100 / t.games) + '%' : '—'}</td>
           <td style="padding:7px 6px;text-align:center;font-size:12px;border-left:1px solid var(--border)">${h2hStr}</td>
-          <td style="padding:7px 10px;text-align:center;font-size:16px;font-weight:900;color:var(--text)">${t.pts}${t._arrastre ? ` <span style="font-size:9px;color:var(--green);cursor:help;font-weight:700" title="${t._ptsTorneo} pts de este torneo + ${t._arrastre} arrastrados (${(getActiveTorneo()||{}).arrastrePct||50}% del torneo anterior)">▴${t._arrastre}</span>` : ''}${t._tie ? ` <span style="font-size:10px;color:var(--orange);cursor:help" title="Empate en ${t._tie.pts} pts con ${t._tie.teams} equipos. Desempate por subtabla (head-to-head): diferencia ${t._tie.miniDiff>0?'+':''}${t._tie.miniDiff}, puntos a favor ${t._tie.miniPf}, en los partidos entre: ${t._tie.rivals.join(', ')}.">🔸</span>` : ''}</td>
           <td style="padding:7px 8px;text-align:center">
             <div style="display:flex;gap:2px;justify-content:center">
               ${(t.last4||[]).map(r=>`<span style="width:16px;height:16px;border-radius:50%;background:${r==='V'?'var(--green)':'var(--red)'};display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;color:#fff;flex-shrink:0">${r}</span>`).join('')}
@@ -32629,10 +32663,11 @@ function doTorneoExport() {
       <thead><tr>
         <th style="${thS};width:28px">#</th>
         <th style="${thS};text-align:left">Equipo</th>
+        <th style="${thS}">PTS</th>
         <th style="${thS}">PJ</th><th style="${thS}">G</th><th style="${thS}">P</th>
         <th style="${thS}">PF</th><th style="${thS}">PC</th><th style="${thS}">DIF</th>
+        <th style="${thS}">%V</th>
         <th style="${thS}">vs ${activeTeamName().split(' ')[0]}</th>
-        <th style="${thS}">PTS</th>
       </tr></thead><tbody>
       ${teams.map((t,i)=>{
         const isActive=t.name.toUpperCase().includes(activeUp.split(' ')[0])||activeUp.includes(t.name.toUpperCase().split(' ')[0]);
@@ -32644,14 +32679,15 @@ function doTorneoExport() {
         return `<tr style="background:${bg};${borderTop}">
           <td style="${tdS};font-weight:700;color:${i<bypass?G:'#555'}">${i+1}</td>
           <td style="${tdS};text-align:left;font-weight:${isActive?800:400};color:${isActive?G:'#000'}">${t.name}</td>
+          <td style="${tdS};font-weight:900;font-size:13pt">${tPts}</td>
           <td style="${tdS};color:#666">${t.games}</td>
           <td style="${tdS};font-weight:700;color:${G}">${t.wins}</td>
           <td style="${tdS};font-weight:700;color:${R}">${t.losses}</td>
           <td style="${tdS}">${t.ptsFor}</td>
           <td style="${tdS}">${t.ptsAga}</td>
           <td style="${tdS};color:${t.diff>0?G:t.diff<0?R:'#888'};font-weight:600">${t.diff>0?'+':''}${t.diff}</td>
+          <td style="${tdS}">${t.games ? Math.round(t.wins * 100 / t.games) + '%' : '—'}</td>
           <td style="${tdS}">${h2hStr}</td>
-          <td style="${tdS};font-weight:900;font-size:13pt">${tPts}</td>
         </tr>`;
       }).join('')}
       </tbody>
