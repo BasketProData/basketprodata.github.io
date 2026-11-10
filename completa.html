@@ -1811,22 +1811,28 @@ body.light .hm-cell{border-color:rgba(0,0,0,.1)}
       <button class="btn btn-sm tf-tpl" onclick="tfApplyTemplate('t1bahia')">T1 Bahía</button>
       <button class="btn btn-sm tf-tpl" onclick="tfApplyTemplate('t2bahia')">T2 Bahía</button>
       <button class="btn btn-sm tf-tpl" onclick="tfApplyTemplate('bronce')">Bronce</button>
-      <button class="btn btn-sm tf-tpl" onclick="tfApplyTemplate('larg')" title="Liga Argentina 2026/27: 17 equipos por conferencia, 32 fechas">Liga Argentina</button>
+      <button class="btn btn-sm tf-tpl" onclick="tfApplyTemplate('larg')" title="Liga Argentina 2026/27: 17 equipos por conferencia, ida y vuelta (32 partidos)">Liga Argentina</button>
+      <button class="btn btn-sm tf-tpl" onclick="tfApplyTemplate('femap')" title="Liga Femenina 2026/27 · Torneo Apertura (poné antes 6 o 7 equipos según la zona)">Fem. Apertura</button>
+      <button class="btn btn-sm tf-tpl" onclick="tfApplyTemplate('femln')" title="Liga Femenina 2026/27 · Liga Nacional (poné antes 6 o 7 equipos según la zona)">Fem. Liga Nacional</button>
       <button class="btn btn-sm tf-tpl" onclick="tfApplyTemplate('blank')" style="color:var(--text3)">En blanco</button>
     </div>
 
-    <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;margin-bottom:10px">
+    <div style="display:grid;grid-template-columns:2fr 1fr 1.3fr 1fr;gap:10px;margin-bottom:10px">
       <div>
         <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Nombre del torneo</div>
         <input id="tf-nombre" type="text" placeholder="Ej: Torneo 1 — Apertura" style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;outline:none">
       </div>
       <div>
         <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Equipos</div>
-        <input id="tf-equipos" type="number" min="2" max="60" value="12" style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;outline:none">
+        <input id="tf-equipos" type="number" min="2" max="60" value="12" oninput="tfAutoFechas()" style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;outline:none">
       </div>
       <div>
-        <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Fechas</div>
-        <input id="tf-fechas" type="number" min="1" max="60" value="11" style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;outline:none">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Ruedas</div>
+        <select id="tf-ruedas" onchange="tfAutoFechas()" style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;outline:none"><option value="1">1 (solo ida)</option><option value="2">2 (ida y vuelta)</option></select>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:4px" title="Partidos que juega cada equipo en la fase regular. Se calcula solo: (equipos − 1) × ruedas">Partidos c/equipo</div>
+        <input id="tf-fechas" type="number" min="1" max="80" value="11" oninput="this.dataset.m='1'" style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;outline:none">
       </div>
     </div>
     <div style="margin-bottom:18px">
@@ -23835,7 +23841,7 @@ function parseRivalRaw(data, fname) {
     if (inTable&&f0&&!isNaN(parseInt(f0))&&row[1]&&row[2]) {
       var mn=parseMin(row[2]);
       var t2=parseFrac(row[4]),t3=parseFrac(row[6]),tl=parseFrac(row[8]);
-      players.push({N:String(row[1]).trim().toUpperCase().replace(/\s+/g,' '),_eq:curTeam,
+      players.push({N:String(row[1]).trim().toUpperCase().replace(/\s+/g,' '),_eq:curTeam,num:String(parseInt(f0)),
         MIN:parseFloat(mn.toFixed(2)),PTS:parseInt(row[3])||0,
         TC2m:t2[0],TC2i:t2[1],TC3m:t3[0],TC3i:t3[1],TLm:tl[0],TLi:tl[1],
         TC2pct:pc(t2[0],t2[1]),TC3pct:pc(t3[0],t3[1]),TLpct:pc(tl[0],tl[1]),
@@ -26668,6 +26674,7 @@ function _armarPlantelesDeLiga(ligaId) {
   var box = _cpLoadLeagueBox(ligaId);
   var juegos = box.leagueGames || [];
   var clubes = {};   // clave -> { nombre, jugadores:[{num,nombre}], _vistos:Set(nombre) }
+  var _idxJuego = 0;
 
   var sumarLado = function(nombreEquipo, jugadores) {
     var clave = _claveClubTablero(nombreEquipo);
@@ -26684,21 +26691,84 @@ function _armarPlantelesDeLiga(ligaId) {
       var nom = (p && p.N || '').trim();
       if (!nom) return;
       var kNom = nom.toUpperCase();
-      if (club._vistos[kNom]) return;   // ya está cargado para este club
-      club._vistos[kNom] = true;
-      club.jugadores.push({ num: String(club.jugadores.length + 1), nombre: nom });
+      // Dorsal del box (si ese partido lo trae). Gana el del partido más reciente.
+      var nG = (typeof p.num === 'string' && /^\d{1,3}$/.test(p.num.trim())) ? String(parseInt(p.num)) : '';   // un 0 numérico es sin dato (así vuelven los campos vacíos al descomprimir)
+      var ent = club._vistos[kNom];
+      if (!ent) { ent = club._vistos[kNom] = { num: '', nombre: nom, _g: '', _gi: -1 }; club.jugadores.push(ent); }
+      if (nG && _idxJuego >= ent._gi) { ent._g = nG; ent._gi = _idxJuego; }
     });
   };
 
+  // De más viejo a más nuevo (por fecha del torneo si existe; si no, por orden de carga)
+  juegos = juegos.map(function(g, i){ return { g: g, i: i }; }).sort(function(a, b){
+    var fa = a.g && Number(a.g.fecha), fb = b.g && Number(b.g.fecha);
+    if (isFinite(fa) && isFinite(fb) && fa !== fb) return fa - fb;
+    return a.i - b.i;
+  }).map(function(x){ return x.g; });
   juegos.forEach(function(g){
+    _idxJuego++;
     if (!g || g.scouting) return;   // los partidos de scouting no son plantel propio
     sumarLado(g.teamA, g.playersA);
     sumarLado(g.teamB, g.playersB);
   });
 
+  // Dorsales que los box no traen (partidos cargados antes de guardarlos): 1) los de la web oficial, 2) el más usado en el play-by-play
+  var _norm = function(t){ return String(t || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Z ]/g, ' ').replace(/\s+/g, ' ').trim(); };
+  var _ape = function(n){ return _norm(String(n).split(',')[0]); };
+  var _pila = function(n){ return (_norm(String(n).split(',').slice(1).join(' ')).split(' ')[0]) || ''; };
+  var pbpDors = {};   // claveClub -> [{ape, pila, c:{num:cant}}]
+  try {
+    juegos.forEach(function(g){
+      if (!g || g.scouting || !g.fname) return;
+      var gid = _gameId(g.fname), st = box.raw && box.raw.pbpStore && box.raw.pbpStore[gid];
+      if (!st) return;
+      var evs = null;
+      try { evs = Array.isArray(st) ? st : JSON.parse(LZString.decompressFromUTF16(st.raw)); } catch (e) { evs = null; }
+      if (!evs) return;
+      var a = st.a || {}, nomLado = { local: a.nombreLocal || g.teamA, visitante: a.nombreVisita || g.teamB };
+      evs.forEach(function(e){
+        if (!e || !e.jugador || !/^\d{1,3}$/.test(String(e.numero || '').trim())) return;
+        var ck = _claveClubTablero(nomLado[e.equipo]); if (!ck) return;
+        var L = pbpDors[ck] = pbpDors[ck] || [], ap = _ape(e.jugador), pl = _pila(e.jugador), f = null;
+        for (var i = 0; i < L.length; i++) if (L[i].ape === ap && L[i].pila === pl) { f = L[i]; break; }
+        if (!f) { f = { ape: ap, pila: pl, c: {} }; L.push(f); }
+        var nn = String(parseInt(e.numero)); f.c[nn] = (f.c[nn] || 0) + 1;
+      });
+    });
+  } catch (e) { console.warn('[Planteles] dorsal desde play-by-play:', e); }
+  var cfgD = (box.cfgData && box.cfgData.dorsales) || {};
+  Object.keys(clubes).forEach(function(k){
+    var club = clubes[k];
+    club.jugadores.forEach(function(j){
+      if (j._g) { j.num = j._g; j.numReal = true; return; }
+      var dc = cfgD[j.nombre];
+      if (dc != null && /^\d{1,3}$/.test(String(dc))) { j.num = String(parseInt(dc)); j.numReal = true; return; }
+      var L = pbpDors[k] || [], ap = _ape(j.nombre), pl = _pila(j.nombre), mejor = null, mc = 0;
+      L.forEach(function(f){
+        if (f.ape !== ap) return;
+        if (f.pila && pl && !(f.pila.indexOf(pl) === 0 || pl.indexOf(f.pila) === 0)) return;
+        Object.keys(f.c).forEach(function(nn){ if (f.c[nn] > mc) { mc = f.c[nn]; mejor = nn; } });
+      });
+      if (mejor) { j.num = mejor; j.numReal = true; }
+    });
+    // Un dorsal real no se repite dentro del club: si dos jugadores lo comparten, queda el del partido más reciente
+    var usados = {};
+    club.jugadores.slice().sort(function(a, b){ return (b._gi || -1) - (a._gi || -1); }).forEach(function(j){
+      if (!j.numReal) return;
+      if (usados[j.num]) { j.numReal = false; j.num = ''; } else usados[j.num] = true;
+    });
+    // Los demás: número de orden libre (que no choque con un dorsal real) y NO marcado como real
+    var n = 1;
+    club.jugadores.forEach(function(j){
+      if (j.numReal) return;
+      while (usados[String(n)]) n++;
+      j.num = String(n); usados[j.num] = true;
+    });
+  });
+
   var out = {};
   Object.keys(clubes).forEach(function(k){
-    out[k] = { nombre: clubes[k].nombre, jugadores: clubes[k].jugadores, staff: [] };
+    out[k] = { nombre: clubes[k].nombre, jugadores: clubes[k].jugadores.map(function(j){ var o = { num: j.num, nombre: j.nombre }; if (j.numReal) o.numReal = true; return o; }), staff: [] };
   });
   return out;
 }
@@ -26716,6 +26786,7 @@ function _descargarPlantelesDeLiga() {
   var clubes = _armarPlantelesDeLiga(ligaId);
   var nClubes = Object.keys(clubes).length;
   var nJug = Object.keys(clubes).reduce(function(s,k){ return s + clubes[k].jugadores.length; }, 0);
+  var nReal = Object.keys(clubes).reduce(function(s,k){ return s + clubes[k].jugadores.filter(function(j){ return j.numReal; }).length; }, 0);
   if (!nClubes) {
     if (typeof toast === 'function') toast('Esa liga todavía no tiene partidos cargados con jugadores.');
     return;
@@ -26723,7 +26794,7 @@ function _descargarPlantelesDeLiga() {
 
   var payload = {
     _basketpro_planteles: true,
-    version: 1,
+    version: 2,
     liga: ligaNombre,
     exportadoEl: new Date().toISOString(),
     clubes: nClubes,
@@ -26740,7 +26811,8 @@ function _descargarPlantelesDeLiga() {
   setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
 
   var resumen = document.getElementById('exp-planteles-resumen');
-  if (resumen) resumen.innerHTML = '✅ Descargado: <b>' + nClubes + ' clubes</b> · <b>' + nJug + ' jugadores</b>.'
+  if (resumen) resumen.innerHTML = '✅ Descargado: <b>' + nClubes + ' clubes</b> · <b>' + nJug + ' jugadores</b> · ' + nReal + ' con dorsal real, ' + (nJug - nReal) + ' con número de orden.'
+    + (nJug - nReal ? '<br><span style="color:var(--text3)">Los que quedan con número de orden son de partidos cargados sin dorsal y sin play-by-play: reimportá el Excel de esos partidos.</span>' : '')
     + '<br>En el Tablero PBP: botón <b>📥 Importar planteles</b>, arriba, y elegí este archivo.';
 }
 
@@ -27173,7 +27245,7 @@ function _cpParseBoxScoreXlsx(wb) {
       }
       var mn = parseMin(row[2]);
       var t2=parseFrac(row[4]), t3=parseFrac(row[6]), tl=parseFrac(row[8]);
-      players.push({N:nombreLimpio,_eq:curTeam,
+      players.push({N:nombreLimpio,_eq:curTeam,num:String(parseInt(f0)),
         MIN:parseFloat(mn.toFixed(2)),PTS:parseInt(row[3])||0,TC2m:t2[0],TC2i:t2[1],TC3m:t3[0],TC3i:t3[1],TLm:tl[0],TLi:tl[1],
         TC2pct:pc(t2[0],t2[1]),TC3pct:pc(t3[0],t3[1]),TLpct:pc(tl[0],tl[1]),REB_D:parseInt(row[10])||0,
         REB_O:parseInt(row[11])||0,REB:parseInt(row[12])||0,AST:parseInt(row[13])||0,REC:parseInt(row[14])||0,
@@ -27502,7 +27574,7 @@ function _cpHtmlStep4Acciones() {
 // Normaliza filas de jugadores al formato que espera el resto de la app.
 // (Función propia del wizard: la app no expone un normalizador global reutilizable.)
 function _cpNormFilas(arr, equipo) {
-  return (arr||[]).map(function(f){ return {
+  return (arr||[]).map(function(f){ var _o = {
     N: f.N || ('#'+(f.numero||'?')), _eq: equipo || f._eq || null,
     MIN: f.MIN||0, PTS: f.PTS||0,
     TC2m: f.TC2m||0, TC2i: f.TC2i||0, TC3m: f.TC3m||0, TC3i: f.TC3i||0, TLm: f.TLm||0, TLi: f.TLi||0,
@@ -27513,7 +27585,10 @@ function _cpNormFilas(arr, equipo) {
     // al cargar (por eso la columna +/- salía en 0 para todos los jugadores).
     FC: (f.FC != null ? f.FC : (f.FP||0)), FR: f.FR||0, PM: f.PM||0,
     _origen: 'carga-guiada'
-  }; });
+  };
+  var _dn = (f.num != null && String(f.num).trim() !== '' && String(f.num) !== 'NaN') ? String(f.num).trim() : ((f.numero != null && /^\d{1,3}$/.test(String(f.numero).trim())) ? String(f.numero).trim() : '');
+  if (_dn) _o.num = _dn;   // dorsal real: sólo si vino (los partidos viejos no lo tienen)
+  return _o; });
 }
 
 // Vuelve al paso de datos para corregir el equipo elegido. Se limpia la
@@ -27942,6 +28017,8 @@ function openTorneoForm(id) {
     document.getElementById('tf-nombre').value = t.nombre || '';
     document.getElementById('tf-equipos').value = (t.formato&&t.formato.equipos) || (cfgData.formato&&cfgData.formato.nEquipos) || 12;
     document.getElementById('tf-fechas').value = (t.formato&&t.formato.fechas) || 11;
+    document.getElementById('tf-ruedas').value = (t.formato&&t.formato.ruedas) || 1;
+    document.getElementById('tf-fechas').dataset.m = (parseInt(document.getElementById('tf-fechas').value) !== ((parseInt(document.getElementById('tf-equipos').value)||0) - 1) * (parseInt(document.getElementById('tf-ruedas').value)||1)) ? '1' : '';
     document.getElementById('tf-arrastre').value = t.arrastrePct || 0;
     tfZonas = (t.formato&&t.formato.zonasClasif) ? JSON.parse(JSON.stringify(t.formato.zonasClasif)) : [];
     tfEquipos = (t.equipos && t.equipos.length) ? JSON.parse(JSON.stringify(t.equipos)) : [];
@@ -27954,7 +28031,7 @@ function openTorneoForm(id) {
   } else {
     document.getElementById('tf-nombre').value = 'Torneo ' + (temp.torneos.length+1);
     document.getElementById('tf-equipos').value = (cfgData.formato&&cfgData.formato.nEquipos)||12;
-    document.getElementById('tf-fechas').value = 11;
+    document.getElementById('tf-fechas').value = 11; document.getElementById('tf-fechas').dataset.m = ''; document.getElementById('tf-ruedas').value = 1;
     document.getElementById('tf-arrastre').value = 0;
     tfZonas = [];
     // Un torneo nuevo HEREDA los equipos del torneo anterior de la misma liga:
@@ -27983,7 +28060,14 @@ function openTorneoForm(id) {
 }
 function closeTorneoForm(){ document.getElementById('torneoModal').style.display='none'; }
 
+function tfAutoFechas() {
+  var f = document.getElementById('tf-fechas'); if (!f || f.dataset.m === '1') return;
+  var eq = parseInt(document.getElementById('tf-equipos').value) || 0, r = parseInt((document.getElementById('tf-ruedas') || {}).value) || 1;
+  if (eq > 1) f.value = (eq - 1) * r;
+  try { tfCheckCobertura(); } catch (e) {}
+}
 function tfApplyTemplate(tpl) {
+  try { var _ff = document.getElementById('tf-fechas'); if (_ff) _ff.dataset.m = ''; } catch (e) {}
   var eq = parseInt(document.getElementById('tf-equipos').value)||12;
   if (tpl==='t1bahia') {
     document.getElementById('tf-nombre').value = 'Torneo 1 — Apertura';
@@ -28000,8 +28084,19 @@ function tfApplyTemplate(tpl) {
     // 1°-4° directo a octavos · 5°-12° reclasificación · 13°-16° sin más juego · 17° desciende (sin serie).
     document.getElementById('tf-nombre').value = 'Fase regular 2026/27';
     document.getElementById('tf-equipos').value = 17;
-    document.getElementById('tf-fechas').value = 32; document.getElementById('tf-arrastre').value = 0;
+    document.getElementById('tf-ruedas').value = 2; tfAutoFechas(); document.getElementById('tf-arrastre').value = 0;
     tfZonas = [{desde:1,hasta:4,destino:'playoffs'},{desde:5,hasta:12,destino:'playin'},{desde:13,hasta:16,destino:'vacaciones'},{desde:17,hasta:17,destino:'playout'}];
+  } else if (tpl==='femap' || tpl==='femln') {
+    // Liga Femenina 2026/27, cada zona: 6 o 7 equipos (según la zona), ida y vuelta.
+    var nz = parseInt(document.getElementById('tf-equipos').value); if (nz !== 6 && nz !== 7) nz = 7;
+    document.getElementById('tf-equipos').value = nz; document.getElementById('tf-ruedas').value = 2; tfAutoFechas(); document.getElementById('tf-arrastre').value = 0;
+    if (tpl==='femap') {   // Torneo Apertura: los 4 mejores de cada zona pasan a los cuadrangulares
+      document.getElementById('tf-nombre').value = 'Torneo Apertura';
+      tfZonas = [{desde:1,hasta:4,destino:'playoffs'},{desde:5,hasta:nz,destino:'vacaciones'}];
+    } else {               // Liga Nacional: 5 mejores de cada zona + el mejor sexto de las tres zonas
+      document.getElementById('tf-nombre').value = 'Liga Nacional Femenina';
+      tfZonas = [{desde:1,hasta:5,destino:'playoffs'},{desde:6,hasta:6,destino:'playin'}].concat(nz > 6 ? [{desde:7,hasta:nz,destino:'vacaciones'}] : []);
+    }
   } else if (tpl==='bronce') {
     document.getElementById('tf-nombre').value = 'Bronce';
     document.getElementById('tf-fechas').value = 11; document.getElementById('tf-arrastre').value = 0;
@@ -28358,6 +28453,7 @@ function tfSave() {
   var formato = {
     equipos: parseInt(document.getElementById('tf-equipos').value)||12,
     fechas: parseInt(document.getElementById('tf-fechas').value)||11,
+    ruedas: parseInt(document.getElementById('tf-ruedas').value)||1,
     zonasClasif: JSON.parse(JSON.stringify(tfZonas)),
     series: {
       playin: parseInt(document.getElementById('tf-s-playin').value)||1,
