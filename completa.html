@@ -39593,10 +39593,10 @@ window.bpGuardia = function(){
       '#bp-fj .fj-fi{font-size:11px;color:var(--text2);padding:3px 0;line-height:1.35;border-top:1px solid var(--border)}#bp-fj .fj-fi:first-of-type{border-top:none}',
       '#bp-fj .fj-tr{margin-bottom:10px}#bp-fj .fj-trh{display:flex;justify-content:space-between;font-size:12px;color:var(--text2)}#bp-fj .fj-trh b{font-size:18px;color:var(--text)}',
       '#bp-fj .fj-trend{font-size:12px;font-weight:800;margin-bottom:4px}',
-      '#bp-fj .fj-vg{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}',
+      '#bp-fj .fj-vg{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,220px));gap:10px}',
       '#bp-fj .fj-v{}',
       '#bp-fj .fj-vi{background:var(--bg3);border:1px solid var(--border);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}',
-      '#bp-fj .fj-vth{position:relative;aspect-ratio:16/9;background:#000;cursor:pointer;display:block;width:100%;border:0;padding:0}',
+      '#bp-fj .fj-vth{position:relative;aspect-ratio:16/9;background:#000;cursor:pointer;display:block;width:100%;border:0;padding:0;text-decoration:none}',
       '#bp-fj .fj-vth img{width:100%;height:100%;object-fit:cover;display:block;opacity:.9}',
       '#bp-fj .fj-vth .pl{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}',
       '#bp-fj .fj-vth .pl i{width:46px;height:46px;border-radius:50%;background:rgba(0,0,0,.6);border:2px solid #fff;display:flex;align-items:center;justify-content:center;color:#fff;font-style:normal;font-size:18px;padding-left:3px}',
@@ -39762,10 +39762,12 @@ window.bpGuardia = function(){
     return V.filter(function (v) { return v && ckey(v.club) === ckey(club) && (v.nombre || '') === (nombre || ''); });
   }
   function itemVideo(v) {
-    var id = ytId(v.url), tit = esc(v.titulo || 'Video'), x = esAdmin() ? '<button class="fj-vx" data-vdel="' + esc(v.id) + '" title="Quitar este video">✕</button>' : '';
-    var link = '<a href="' + esc(v.url) + '" target="_blank" rel="noopener">Abrir ↗</a>';
-    if (!id) return '<div class="fj-vi"><div class="fj-vt"><span>🎬 ' + tit + '</span><span>' + link + x + '</span></div></div>';
-    return '<div class="fj-vi"><button class="fj-vth" data-vplay="' + id + '" aria-label="Reproducir ' + tit + '"><img src="https://i.ytimg.com/vi/' + id + '/mqdefault.jpg" alt="" loading="lazy" onerror="this.style.display=\'none\'"><span class="pl"><i>▶</i></span></button><div class="fj-vt"><span>' + tit + '</span><span>' + link + x + '</span></div></div>';
+    var id = ytId(v.url), tit = esc(v.titulo || 'Video'), url = esc(v.url);
+    var x = esAdmin() ? '<button class="fj-vx" data-vdel="' + esc(v.id) + '" title="Quitar este video">✕</button>' : '';
+    // Un toque abre el video en YouTube (otra pestaña o la app de YouTube en el celular).
+    var th = id ? '<a class="fj-vth" href="' + url + '" target="_blank" rel="noopener" aria-label="Ver ' + tit + ' en YouTube"><img src="https://i.ytimg.com/vi/' + id + '/mqdefault.jpg" alt="" loading="lazy" onerror="this.style.display=\'none\'"><span class="pl"><i>▶</i></span></a>'
+      : '<a class="fj-vth" href="' + url + '" target="_blank" rel="noopener" style="aspect-ratio:auto;padding:14px;text-align:center;color:#fff;text-decoration:none;font-size:12px">🎬 Ver video ↗</a>';
+    return '<div class="fj-vi">' + th + '<div class="fj-vt"><span>' + tit + '</span><span>' + x + '</span></div></div>';
   }
   function equipoVideos(L) {
     var propio = (typeof activeTeamName === 'function') ? activeTeamName() : '';
