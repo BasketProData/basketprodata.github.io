@@ -3100,7 +3100,7 @@ function exportInformePartido(fname) {
       <div style="font-size:20pt;font-weight:900;color:${G};margin-top:4px">${escHtml(miNombre)} <span style="color:#999;font-weight:400">vs</span> ${escHtml(rivalNombre)}</div>
       <div style="font-size:26pt;font-weight:900;margin-top:8px;color:${gano?G:R}">${miScore} — ${rivalScore}</div>
       <div style="font-size:10pt;color:#666;margin-top:4px">
-        ${g.fecha!=null?'Fecha '+g.fecha+' · ':''}${esBoxLocal?'Local':'Visitante'} · ${gano?'Victoria':'Derrota'}
+        ${g.fecha!=null?'P'+g.fecha+' · ':''}${esBoxLocal?'Local':'Visitante'} · ${gano?'Victoria':'Derrota'}
       </div>
     </div>`;
 
@@ -3790,7 +3790,10 @@ const ag = () => {
     if (seen.has(g.fname)) return false;
     seen.add(g.fname);
     return true;
-  }).sort((a,b)=>_fechaNum(a)-_fechaNum(b));
+  });
+  // Nº de partido del equipo (P): por día si lo hay, si no por orden de carga.
+  if (typeof window._bpAsignarP === 'function') window._bpAsignarP(dedup, activeTeam);
+  dedup.sort((a,b)=>_fechaNum(a)-_fechaNum(b));
   // Asignar un id ESTABLE derivado del fname. ag() reconstruye los partidos en
   // cada llamada, así que el id no puede ser aleatorio ni posicional: debe salir
   // del fname (único e inmutable) para que claves como pbpStore[id] sigan válidas
@@ -3990,12 +3993,17 @@ const snD = (n) => {
   } catch(e) {}
   return apellido;
 };
+function _matchP(g) {   // Nº de partido del equipo (P); si no hay, el "Fecha N" del nombre del archivo
+  const n = (g && !g.isPlayoff && g.fecha != null && g.fecha !== '' && isFinite(+g.fecha)) ? Math.round(+g.fecha) : null;
+  if (n != null) return [String(n), String(n)];
+  return ((g && g.fname) || '').replace(/_/g,' ').match(/fecha\s*(\d+)/i);
+}
 const gl   = g => {
   // La fecha sale del campo del partido; el nombre queda sólo de respaldo.
   const n = (typeof _fechaNum === 'function') ? _fechaNum(g) : 9999;
   const rv = (g.rival||'').replace(/^\s*\d+[°ºª]\s*/,'').substring(0,8);
   const casa = (g.location==='L' ? '🏠 ' : '✈️ ');
-  return casa + (n !== 9999 ? ('F' + n + ' vs ' + rv) : (rv || g.fname));
+  return casa + (n !== 9999 ? ('P' + n + ' vs ' + rv) : (rv || g.fname));
 };
 const dc   = id => { if(charts[id]){ charts[id].destroy(); delete charts[id]; } };
 
@@ -4489,7 +4497,7 @@ function updateFechasLabel() {
   } else if (s === 1) {
     const idx = [...sel][0];
     const g = ag()[idx];
-    if (lbl && g) lbl.textContent = (()=>{const _m=(g.fname||'').replace(/_/g,' ').match(/fecha\s*(\d+)/i);const _rv=(g.rival||'').replace(/^\s*\d+[°ºª]\s*/,'').substring(0,6);return (_m?'F'+_m[1]:(g.fname||'').substring(0,6))+(_rv?' '+_rv:'');})();
+    if (lbl && g) lbl.textContent = (()=>{const _m=_matchP(g);const _rv=(g.rival||'').replace(/^\s*\d+[°ºª]\s*/,'').substring(0,6);return (_m?'P'+_m[1]:(g.fname||'').substring(0,6))+(_rv?' '+_rv:'');})();
   } else {
     if (lbl) lbl.textContent = s + ' fechas seleccionadas';
   }
@@ -5288,7 +5296,7 @@ function pbpRenderTendenciaQuintetos(partidos, todosFiltro) {
   const colSigno = v => v > 0 ? G : (v < 0 ? R : '#888');
   const fmtSigno = v => (v > 0 ? '+' : '') + Math.round(v);
   // Cobertura: qué partidos del filtro entraron y cuáles no (sin PBP).
-  const _etq = g => escHtml(g.fecha!=null && g.fecha!=='' ? ('F' + g.fecha + ' vs ' + (g.rival||'')) : (g.fname||''));
+  const _etq = g => escHtml(g.fecha!=null && g.fecha!=='' ? ('P' + g.fecha + ' vs ' + (g.rival||'')) : (g.fname||''));
   const _todos = (todosFiltro && todosFiltro.length) ? todosFiltro : partidos;
   const sinPbp = _todos.filter(g => !pbpTieneDatos(g.id || _gameId(g.fname)));
   const coberturaHTML = `<div style="font-size:12px;color:var(--text2,#555);background:var(--bg3,#f8fafc);border-radius:8px;padding:9px 12px;margin-bottom:14px;line-height:1.5">
@@ -8602,7 +8610,7 @@ function _globalVerCruce(teamA, teamB) {
   const filasDetalle = entreSi.map(g => {
     const etiqueta = g.esPlayoff
       ? `<span style="background:rgba(200,134,10,.16);color:#c8860a;font-size:9px;font-weight:700;padding:1px 6px;border-radius:10px;margin-right:6px">${escHtml(g.faseLabel||'Playoffs')}</span>`
-      : (g.fecha!=null ? `<span style="background:var(--bg3);color:var(--text3);font-size:9px;font-weight:700;padding:1px 6px;border-radius:10px;margin-right:6px">F${g.fecha}</span>` : '');
+      : (g.fecha!=null ? `<span style="background:var(--bg3);color:var(--text3);font-size:9px;font-weight:700;padding:1px 6px;border-radius:10px;margin-right:6px">P${g.fecha}</span>` : '');
     const ctx = [g.torneo, g.anio].filter(Boolean).join(' ') || g.fname || '';
     const gano = g.vmScore > g.rvScore;
     return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;padding:5px 0;border-bottom:0.5px solid var(--border)">
@@ -8877,7 +8885,7 @@ function _homeLecturaRapida(games) {
     const fn = String(ult.fname || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
     cards.push(card('🏁', 'Último partido',
       `<span style="color:${gano ? G : R}">${gano ? 'Ganó' : 'Perdió'} ${ult.vmScore}-${ult.rvScore}</span> vs ${escHtml(ult.rival || '')}`,
-      `${ult.fecha != null && ult.fecha !== '' ? 'Fecha ' + escHtml(String(ult.fecha)) + ' · ' : ''}${ult.location === 'L' ? 'Local' : 'Visitante'}`,
+      `${ult.fecha != null && ult.fecha !== '' ? 'P' + escHtml(String(ult.fecha)) + ' · ' : ''}${ult.location === 'L' ? 'Local' : 'Visitante'}`,
       gano ? G : R,
       (typeof exportInformePartido === 'function') ? `<button onclick="exportInformePartido('${fn}')" style="margin-top:6px;align-self:flex-start;padding:5px 10px;border-radius:6px;border:1px solid ${G};background:transparent;color:${G};font-size:11px;font-weight:700;cursor:pointer">Ver informe →</button>` : ''));
   }
@@ -10333,7 +10341,7 @@ function rHM(cid) {
   }
   let h=`<div style="display:inline-block;min-width:${100+games.length*38}px;padding:4px 0">`;
   h+='<div style="display:flex;align-items:center;margin-bottom:4px"><div style="width:95px"></div>';
-  games.forEach(g=>{h+=`<div class="hm-head">${(()=>{const _m=(g.fname||'').replace(/_/g,' ').match(/fecha\s*(\d+)/i);const _rv=(g.rival||'').replace(/^\s*\d+[°ºª]\s*/,'').substring(0,6);return (_m?'F'+_m[1]:(g.fname||'').substring(0,6))+(_rv?' '+_rv:'');})()}</div>`;});
+  games.forEach(g=>{h+=`<div class="hm-head">${(()=>{const _m=_matchP(g);const _rv=(g.rival||'').replace(/^\s*\d+[°ºª]\s*/,'').substring(0,6);return (_m?'P'+_m[1]:(g.fname||'').substring(0,6))+(_rv?' '+_rv:'');})()}</div>`;});
   h+='</div>';
   players.forEach(p=>{
     h+='<div class="hm-row">';
@@ -11116,7 +11124,7 @@ function rForm(){
   else if (sortMode==='trend_dn')  players.sort((a,b)=>a._diff-b._diff);
   else if (sortMode==='name')      players.sort((a,b)=>sn(a.name).localeCompare(sn(b.name)));
   let h=`<table><thead><tr><th>Jugador</th><th>Prom.</th>`;
-  games.forEach(g=>{h+=`<th>${(()=>{const _m=(g.fname||'').replace(/_/g,' ').match(/fecha\s*(\d+)/i);const _rv=(g.rival||'').replace(/^\s*\d+[°ºª]\s*/,'').substring(0,6);return (_m?'F'+_m[1]:(g.fname||'').substring(0,6))+(_rv?' '+_rv:'');})()}</th>`;});
+  games.forEach(g=>{h+=`<th>${(()=>{const _m=_matchP(g);const _rv=(g.rival||'').replace(/^\s*\d+[°ºª]\s*/,'').substring(0,6);return (_m?'P'+_m[1]:(g.fname||'').substring(0,6))+(_rv?' '+_rv:'');})()}</th>`;});
   h+=`<th>Últ.2</th><th>Tend.</th></tr></thead><tbody>`;
   players.forEach(p=>{
     const vals=games.map(g=>getStat(p,g,stat)).filter(v=>v!==null);
@@ -11624,7 +11632,7 @@ function perfRenderEvol(name) {
   const p = players.find(x => x.name === name); if (!p) return;
   const stat = (document.getElementById('perfEvolStat') || {value:'VAL'}).value;
   const games = sg();
-  const lbs = games.map(g=>{const m=(g.fname||'').replace(/_/g,' ').match(/fecha\s*(\d+)/i);const rv=(g.rival||'').replace(/^\s*\d+[°ºª]\s*/,'').substring(0,6);return (m?'F'+m[1]:g.fname.substring(0,6))+(rv?' '+rv:'');});
+  const lbs = games.map(g=>{const m=_matchP(g);const rv=(g.rival||'').replace(/^\s*\d+[°ºª]\s*/,'').substring(0,6);return (m?'P'+m[1]:g.fname.substring(0,6))+(rv?' '+rv:'');});
   const data = games.map(g => {
     const r = g.vm.find(r => p.rn.includes(r.N) && r.MIN >= MT); if (!r) return null;
     if (stat==='TC2pct') return pc(r.TC2m,r.TC2i);
@@ -12648,7 +12656,35 @@ function accCardsHTML(rows, sortMode, tlInfo) {
         + '<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--text3);vertical-align:-1px"></span> uso medio</span>'
         + '<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--red);vertical-align:-1px"></span> de las menos usadas</span>'
         + '</div>';
+  const _fmt1 = x => (Math.round(x*10)/10).toString();
+  const _ptsCampo = rows.reduce((q,r)=>q+(+r.aAvg||0),0);
+  const _resumen = (tlInfo && tlInfo.i > 0 && !tlInfo.nOtros)
+    ? '<div style="display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline;font-size:12px;color:var(--text2);margin:0 0 12px;padding:9px 12px;border:0.5px solid var(--border);border-radius:8px;background:var(--bg3)">'
+      + '<b style="color:var(--text)">Cómo se arman los puntos' + (accDataMode==='acum'?' (total)':' (por partido)') + ':</b>'
+      + '<span>Jugadas <b style="color:var(--text)">' + _fmt1(_ptsCampo) + '</b></span><span>+</span>'
+      + '<span>Tiros libres <b style="color:var(--text)">' + _fmt1(tlInfo.mAvg) + '</b></span><span>=</span>'
+      + '<span><b style="color:var(--text)">' + _fmt1(_ptsCampo + tlInfo.mAvg) + '</b></span></div>'
+    : '';
+  h += _resumen;
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px">';
+  // Tiros libres: categoría propia, primera de la grilla. No entra en el % de uso.
+  if (tlInfo && tlInfo.i > 0) {
+    const ef = Math.round(100 * tlInfo.m / tlInfo.i);
+    h += '<div class="card" style="padding:12px">'
+       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-bottom:8px;border-bottom:0.5px solid var(--border)">'
+       + '<div style="display:flex;align-items:center;gap:7px"><span style="font-size:15px">🎯</span>'
+       + '<span style="font-size:12px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.4px">Tiros libres</span></div>'
+       + '<span style="font-size:10.5px;font-weight:700;color:var(--text2);white-space:nowrap;margin-left:8px">' + ef + '% efec.</span>'
+       + '</div>'
+       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">'
+       + '<span style="font-size:11px;color:var(--text)">Tiros libres</span>'
+       + '<span style="font-size:11px;color:var(--text2)"><b style="color:var(--text)">' + tlInfo.mAvg + '/' + tlInfo.iAvg + '</b> (' + ef + '%)</span>'
+       + '</div>'
+       + '<div style="font-size:10px;color:var(--text3);margin-top:4px;line-height:1.4">Del box score de los ' + tlInfo.n + ' partido' + (tlInfo.n===1?'':'s') + ' cargado' + (tlInfo.n===1?'':'s') + ' con PBP o Tablero' + (accDataMode==='acum'?'':' (promedio de esos partidos)') + '. No cuenta en el % de uso.'
+       + (tlInfo.nOtros ? ' En los ' + tlInfo.nOtros + ' partido' + (tlInfo.nOtros===1?'':'s') + ' de Excel o carga manual, los libres ya están dentro de cada jugada.' : '')
+       + '</div>'
+       + '</div>';
+  }
   GRUPOS.forEach(g => {
     // filas del grupo que tienen datos o existen
     let filas = g.subs.map(s => bySub[s]).filter(Boolean);
@@ -12693,25 +12729,6 @@ function accCardsHTML(rows, sortMode, tlInfo) {
     });
     h += '</div>';
   });
-  // Tiros libres: categoría propia (no se atribuyen a una jugada). No entra en
-  // el % de uso porque no son intentos de jugada.
-  if (tlInfo && tlInfo.i > 0) {
-    const ef = Math.round(100 * tlInfo.m / tlInfo.i);
-    h += '<div class="card" style="padding:12px">'
-       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-bottom:8px;border-bottom:0.5px solid var(--border)">'
-       + '<div style="display:flex;align-items:center;gap:7px"><span style="font-size:15px">🎯</span>'
-       + '<span style="font-size:12px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.4px">Tiros libres</span></div>'
-       + '<span style="font-size:10.5px;font-weight:700;color:var(--text2);white-space:nowrap;margin-left:8px">' + ef + '% efec.</span>'
-       + '</div>'
-       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">'
-       + '<span style="font-size:11px;color:var(--text)">Tiros libres</span>'
-       + '<span style="font-size:11px;color:var(--text2)"><b style="color:var(--text)">' + tlInfo.mAvg + '/' + tlInfo.iAvg + '</b> (' + ef + '%)</span>'
-       + '</div>'
-       + '<div style="font-size:10px;color:var(--text3);margin-top:4px;line-height:1.4">Del box score de los ' + tlInfo.n + ' partido' + (tlInfo.n===1?'':'s') + ' cargado' + (tlInfo.n===1?'':'s') + ' con PBP' + (accDataMode==='acum'?'':' (promedio de esos partidos)') + '. No cuenta en el % de uso.'
-       + (tlInfo.nOtros ? ' En los ' + tlInfo.nOtros + ' partido' + (tlInfo.nOtros===1?'':'s') + ' de Excel o carga manual, los libres ya están dentro de cada jugada.' : '')
-       + '</div>'
-       + '</div>';
-  }
   h += '</div>';
   return h;
 }
@@ -12862,7 +12879,7 @@ function rAcc() {
     // Filter to selected games only
     const d = keysActivas.length===1 ? accData[keysActivas[0]] : null;
     if (d) {
-    const src = accTabMode==='vm' ? d.vm : (rivalAccData['rivales']?rivalAccData['rivales'].rv:[]);
+    const src = accTabMode==='vm' ? d.vm : (d.rv || []);
     const map = Object.fromEntries(src.map(r=>[r.cat+'|'+r.sub,r]));
     // Build in fixed order
     const ORDER = accOrder();
@@ -12895,13 +12912,18 @@ function rAcc() {
   try {
     const entradasSel = usaTodas ? _accEntradasPorJuego(ag()) : _accEntradasPorJuego(juegosFiltrados).filter(e => keysActivas.includes(e.k));
     const juegosTL = entradasSel.filter(e => e.d && e.d._origenPbp).map(e => e.g);
-    const nOtros = entradasSel.length - juegosTL.length;
-    if (juegosTL.length) {
+    const ladoK = accTabMode === 'vm' ? 'vm' : 'rv';
+    // Partidos del Tablero: los libres vienen aparte (tablero.tirosLibres), tanto del equipo como del rival.
+    const entTab = entradasSel.filter(e => e.d && !e.d._origenPbp && e.d._origen === 'tablero' && e.d.tablero && e.d.tablero.tirosLibres && e.d.tablero.tirosLibres[ladoK]);
+    const nConTL = juegosTL.length + entTab.length;
+    const nOtros = entradasSel.length - nConTL;
+    if (nConTL) {
       const lado = g => accTabMode === 'vm' ? (typeof vvm === 'function' ? vvm(g) : (g.vm||[])) : (g.rv||[]);
       let m = 0, i = 0;
       juegosTL.forEach(g => lado(g).forEach(p => { m += +p.TLm || 0; i += +p.TLi || 0; }));
-      const n = accDataMode === 'acum' ? 1 : juegosTL.length;
-      tlInfo = { m, i, mAvg: f1(m / n), iAvg: f1(i / n), n: juegosTL.length, nOtros };
+      entTab.forEach(e => { const t = e.d.tablero.tirosLibres[ladoK]; m += +t.a || 0; i += +t.i || 0; });
+      const n = accDataMode === 'acum' ? 1 : nConTL;
+      tlInfo = { m, i, mAvg: f1(m / n), iAvg: f1(i / n), n: nConTL, nOtros };
     }
   } catch(e) { console.warn('tiros libres en acciones:', e); }
   document.getElementById('acc-table').innerHTML = accCardsHTML(rows, sortMode, tlInfo);
@@ -12913,28 +12935,30 @@ function rAcc() {
   (function renderCuadre(){
     const box = document.getElementById('acc-cuadre');
     if (!box) return;
-    if (accTabMode !== 'vm') { box.style.display='none'; return; }
+    const LADO = (accTabMode === 'rv') ? 'rv' : 'vm';                       // el control vale para el equipo y para los rivales
+    const scoreL = g => LADO === 'vm' ? g.vmScore : g.rvScore;
+    const quien = LADO === 'vm' ? 'del equipo' : 'de los rivales';
+    const ladoJug = g => LADO === 'vm' ? (typeof vvm === 'function' ? (vvm(g) || []) : (g.vm || [])) : (g.rv || []);
 
     // Puntos sumados de las acciones (según el modo prom/acum que se ve en pantalla).
     const esProm = (accDataMode === 'prom');
     // Puntos de las acciones de UN partido: la columna A son puntos convertidos
     // en todas las fuentes. En las del PBP los libres van aparte (categoría
     // Tiros libres), así que se suman desde el box score.
-    const ptsDeEntrada = (d, g) => {
-      if (!d || !d.vm) return 0;
-      if (d._origenPbp) {
-        const fg = d.vm.reduce((s,r)=>s+(+r.a||0),0);
-        const tl = g ? (vvm(g)||[]).reduce((s,p)=>s+(+p.TLm||0),0) : 0;
-        return fg + tl;
-      }
-      const _tlT = (d._origen === 'tablero' && d.tablero && d.tablero.tirosLibres && d.tablero.tirosLibres.vm) ? (+d.tablero.tirosLibres.vm.a || 0) : 0;
-      return d.vm.reduce((s,r)=>s+(r.a||0),0) + _tlT;
+    const tlDeEntrada = (d, g) => {
+      if (!d) return 0;
+      if (d._origenPbp) return g ? ladoJug(g).reduce((s,p)=>s+(+p.TLm||0),0) : 0;
+      return (d._origen === 'tablero' && d.tablero && d.tablero.tirosLibres && d.tablero.tirosLibres[LADO]) ? (+d.tablero.tirosLibres[LADO].a || 0) : 0;
     };
-    let _sumPtsTodas = 0;
+    const ptsDeEntrada = (d, g) => {
+      if (!d || !d[LADO]) return 0;
+      return d[LADO].reduce((s,r)=>s+(+r.a||0),0) + tlDeEntrada(d, g);
+    };
+    let _sumPtsTodas = 0, _sumTLTodas = 0;
     keysActivas.forEach(k => {
       const d = accData[k];
       const g = claveAJuego[k] || (d ? ag().find(x => accMatchesGame(d.fname, d.rival, x.fname, x.rival)) : null);
-      _sumPtsTodas += ptsDeEntrada(d, g);
+      _sumPtsTodas += ptsDeEntrada(d, g); _sumTLTodas += tlDeEntrada(d, g);
     });
     const sumAccPts = esProm ? _sumPtsTodas / Math.max(keysActivas.length, 1) : _sumPtsTodas;
 
@@ -12951,17 +12975,17 @@ function rAcc() {
         const d = accData[k];
         if (d) g = ag().find(x => accMatchesGame(d.fname, d.rival, x.fname, x.rival));
       }
-      if (g && typeof g.vmScore === 'number') {
-        realTotal += g.vmScore; conJuego++;
+      if (g && typeof scoreL(g) === 'number') {
+        realTotal += scoreL(g); conJuego++;
         // Puntos de acciones de ESTE partido (suma del campo a de sus filas vm).
         const d = accData[k];
         const ptsAccJuego = ptsDeEntrada(d, g);
         // Si las acciones de un partido quedan muy por debajo de lo que anotó el
         // equipo (faltan acciones por cargar), lo marcamos como sospechoso.
-        const faltante = g.vmScore - ptsAccJuego;
-        if (g.vmScore >= 20 && faltante >= Math.max(10, g.vmScore*0.25)) {
+        const faltante = scoreL(g) - ptsAccJuego;
+        if (scoreL(g) >= 20 && faltante >= Math.max(10, scoreL(g)*0.25)) {
           sospechosos.push({ nombre:(d && d.fname ? d.fname : g.fname||'').replace(/_/g,' ').replace(/\.xlsx?$/i,''),
-                             rival:g.rival||'', acc:ptsAccJuego, real:g.vmScore });
+                             rival:g.rival||'', acc:ptsAccJuego, real:scoreL(g) });
         }
       }
     });
@@ -12978,6 +13002,8 @@ function rAcc() {
     // Si no pudimos vincular ningún juego, no mostramos el cuadre (evita falsos negativos).
     if (!conJuego) { box.style.display='none'; return; }
 
+    const _tlBase = esProm ? _sumTLTodas / Math.max(keysActivas.length, 1) : _sumTLTodas;
+    const tlMostrar = (esProm && nAcc !== conJuego && conJuego > 0) ? (_tlBase * nAcc) / conJuego : _tlBase;
     const dif = sumAccAjustada - realPts;
     const ok = Math.abs(dif) <= Math.max(1, realPts*0.02); // tolerancia 2% o 1 pto por redondeo
     const G='var(--green)', R='var(--red)', AM='#c8860a';
@@ -12988,7 +13014,7 @@ function rAcc() {
     // Mensaje: si hay sospechosos, señalarlos por nombre; si no, mensaje genérico.
     let detalle;
     if (ok) {
-      detalle = `La suma de puntos de las acciones cuadra con los puntos del equipo.`;
+      detalle = `La suma de puntos de las acciones cuadra con los puntos ${quien}.`;
     } else if (sospechosos.length) {
       // Ordenar por mayor faltante.
       sospechosos.sort((a,b)=>(b.real-b.acc)-(a.real-a.acc));
@@ -12998,7 +13024,7 @@ function rAcc() {
       const extra = sospechosos.length>3 ? ` y ${sospechosos.length-3} más` : '';
       detalle = `Diferencia de ${dif>0?'+':''}${f1(dif)} pts. Hay ${sospechosos.length===1?'un partido':'partidos'} con acciones incompletas: ${items}${extra}. Completá ${sospechosos.length===1?'ese Excel de acciones':'esos Excels'} y volvé a cargarlo${sospechosos.length===1?'':'s'}.`;
     } else {
-      detalle = `Hay una diferencia de ${dif>0?'+':''}${f1(dif)} pts respecto a los puntos del equipo. Puede que un partido tenga acciones cargadas pero no su box score (o viceversa), o que un Excel tenga datos incompletos.`;
+      detalle = `Hay una diferencia de ${dif>0?'+':''}${f1(dif)} pts respecto a los puntos ${quien}. Puede que un partido tenga acciones cargadas pero no su box score (o viceversa), o que un Excel tenga datos incompletos.`;
     }
 
     // Partidos del filtro que no tienen acciones: el promedio de Acciones no
@@ -13007,7 +13033,7 @@ function rAcc() {
       const vinculados = new Set(Object.values(claveAJuego).map(g => g.fname));
       const faltan = juegosFiltrados.filter(g => !vinculados.has(g.fname));
       if (faltan.length && !usaTodas) {
-        const et = g => escHtml((g.fecha!=null && g.fecha!=='' ? 'F'+g.fecha+' ' : '') + 'vs ' + (g.rival||''));
+        const et = g => escHtml((g.fecha!=null && g.fecha!=='' ? 'P'+g.fecha+' ' : '') + 'vs ' + (g.rival||''));
         // ¿Tiene PBP? Si lo tiene pero sin tipos de jugada, casi seguro se
         // importó antes de que la app leyera las etiquetas del Tablero: los
         // eventos guardados no las traen y hay que volver a importar el archivo.
@@ -13027,7 +13053,8 @@ function rAcc() {
       <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;padding:11px 14px;border-radius:9px;background:${ok?'rgba(27,122,61,.07)':'rgba(200,134,10,.08)'};border:1px solid ${col}33">
         <span style="font-size:18px">${icon}</span>
         <div style="flex:1;min-width:200px">
-          <div style="font-size:12px;font-weight:700;color:${col}">Control de cuadre — ${f1(sumAccAjustada)} pts en acciones vs ${f1(realPts)} pts del equipo${sufijo}</div>
+          <div style="font-size:12px;font-weight:700;color:${col}">Control de cuadre ${LADO==='vm'?'(equipo)':'(rivales)'} — ${f1(sumAccAjustada)} pts en acciones vs ${f1(realPts)} pts ${quien}${sufijo}</div>
+          ${tlMostrar>0?`<div style="font-size:11px;color:var(--text2);margin-top:2px">Incluye ${f1(tlMostrar)} pts de tiros libres, que van en su propia tarjeta (abajo del todo).</div>`:''}
           <div style="font-size:11px;color:var(--text2);margin-top:2px;line-height:1.45">${detalle}${(nAcc!==conJuego && !sospechosos.length)?` <span style="color:${AM}">(${nAcc} partido${nAcc!==1?'s':''} con acciones vs ${conJuego} con box score)</span>`:''}</div>
         </div>
       </div>`;
@@ -13933,7 +13960,7 @@ function _preEnfrentamientos() {
 
 // Etiqueta corta de un cruce: torneo + fecha o fase de playoff.
 function _preEtiquetaCruce(g) {
-  const fase = g.isPlayoff ? (g.fase || 'Playoffs') : (g.fecha != null && g.fecha !== '' ? 'Fecha ' + g.fecha : '');
+  const fase = g.isPlayoff ? (g.fase || 'Playoffs') : (g.fecha != null && g.fecha !== '' ? 'P' + g.fecha : '');
   return [g.torneo, fase].filter(Boolean).join(' · ') || (g.fname || '');
 }
 
@@ -14174,7 +14201,7 @@ function _preEnfrentamientoAnterior() {
       if (q) {
         const gan = q.ganaLocal === (lado === 'local') ? tn : rn;
         const cuarto = Math.floor(q.seg / 600) + 1, min = Math.floor((q.seg % 600) / 60);
-        datos.momentos.push(`${g.fecha!=null&&g.fecha!==''?'F'+g.fecha+': ':''}${q.tipo==='decisivo'?'parejo hasta el cierre; '+gan+' pasó adelante para siempre':'el partido se abrió a favor de '+gan} en el minuto ${min} del ${cuarto}° cuarto (${q.local}-${q.visita}).`);
+        datos.momentos.push(`${g.fecha!=null&&g.fecha!==''?'P'+g.fecha+': ':''}${q.tipo==='decisivo'?'parejo hasta el cierre; '+gan+' pasó adelante para siempre':'el partido se abrió a favor de '+gan} en el minuto ${min} del ${cuarto}° cuarto (${q.local}-${q.visita}).`);
       }
     } catch(e) { console.warn('enfrentamiento anterior:', e); }
   });
@@ -18277,7 +18304,7 @@ function exportBalance(type) {
       const r = parcialesDe(g);
       if (!r) return;
       partidosConQ++;
-      if (r.ot) { const _n = (typeof _fechaNum === 'function') ? _fechaNum(g) : 9999; otPartidos.push({ fecha: _n !== 9999 ? 'F' + _n : (g.fname || ''), vm: r.ot.vm, rv: r.ot.rv }); }
+      if (r.ot) { const _n = (typeof _fechaNum === 'function') ? _fechaNum(g) : 9999; otPartidos.push({ fecha: _n !== 9999 ? 'P' + _n : (g.fname || ''), vm: r.ot.vm, rv: r.ot.rv }); }
       if (r.fuente==='pbp') fuentePBP++; else fuenteManual++;
       for (let i=0; i<4; i++) {
         const f = r.vm[i], a2 = r.rv[i];
@@ -19290,7 +19317,7 @@ function _sitCSS(acento) {
 function _sitPeriodoTxt(js) {
   if (!js || !js.length) return '';
   const reg = js.filter(g => !g.isPlayoff), po = js.filter(g => g.isPlayoff);
-  const et = g => { const n = (typeof _fechaNum === 'function') ? _fechaNum(g) : 9999; return n !== 9999 ? 'Fecha ' + n : (g.fname || ''); };
+  const et = g => { const n = (typeof _fechaNum === 'function') ? _fechaNum(g) : 9999; return n !== 9999 ? 'P' + n : (g.fname || ''); };
   const base = js.length === 1 ? '1 partido' : js.length + ' partidos';
   const detalle = po.length ? ` (${reg.length} de fase regular y ${po.length} de playoffs)` : '';
   const rango = reg.length > 1 ? `: ${et(reg[0])} a ${et(reg[reg.length - 1])}` : '';
@@ -19428,7 +19455,7 @@ function _sitSvgDif(js) {
     const n = (typeof _fechaNum === 'function') ? _fechaNum(g) : null;
     o += `<rect x="${(cx - bw / 2).toFixed(1)}" y="${yy.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(h, 1).toFixed(1)}" fill="${d >= 0 ? '#3d9a5f' : '#d4685d'}" rx="2"/>`
        + `<text x="${cx.toFixed(1)}" y="${(d >= 0 ? yy - 3 : yy + h + 10).toFixed(1)}" font-size="9" font-weight="700" fill="${d >= 0 ? _SIT_G : _SIT_R}" text-anchor="middle">${d > 0 ? '+' : ''}${d}</text>`
-       + `<text x="${cx.toFixed(1)}" y="${H - 20}" font-size="8.5" fill="#555" text-anchor="middle">${n != null && n !== 9999 ? 'F' + n : ''}</text>`
+       + `<text x="${cx.toFixed(1)}" y="${H - 20}" font-size="8.5" fill="#555" text-anchor="middle">${n != null && n !== 9999 ? 'P' + n : ''}</text>`
        + `<text x="${cx.toFixed(1)}" y="${H - 9}" font-size="7.5" fill="#999" text-anchor="middle">${g.location === 'L' ? 'local' : 'visita'}</text>`;
   });
   return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px;background:#fff;border:1px solid #e5e0d5;border-radius:8px" xmlns="http://www.w3.org/2000/svg" font-family="sans-serif">${o}</svg>`;
@@ -19440,7 +19467,7 @@ function _sitTablaPartidos(js) {
     const a = adv((typeof vvm === 'function') ? vvm(g) : (g.vm || []), (g.rv || []).filter(p => (p.MIN || 0) >= 1));
     const i = rows.findIndex(r => teamNameMatch(r.name, g.rival));
     const d = g.vmScore - g.rvScore, n = (typeof _fechaNum === 'function') ? _fechaNum(g) : null;
-    return `<tr><td>${g.isPlayoff ? 'PO' : (n != null && n !== 9999 ? 'F' + n : '')}</td><td style="text-align:left">${_sitE(g.rival)}${i >= 0 ? ` <span style="color:#999">(${i + 1}º)</span>` : ''}</td><td>${g.location === 'L' ? 'Local' : 'Visita'}</td>
+    return `<tr><td>${g.isPlayoff ? 'PO' : (n != null && n !== 9999 ? 'P' + n : '')}</td><td style="text-align:left">${_sitE(g.rival)}${i >= 0 ? ` <span style="color:#999">(${i + 1}º)</span>` : ''}</td><td>${g.location === 'L' ? 'Local' : 'Visita'}</td>
       <td style="font-weight:700">${g.vmScore}–${g.rvScore}</td><td style="font-weight:700;color:${d > 0 ? _SIT_G : _SIT_R}">${d > 0 ? 'G' : 'P'} ${_sitSg(d)}</td><td>${_sitR1(a.OER)}</td><td>${_sitR1(a.DER)}</td><td>${_sitR1(a.eFGv)}%</td><td>${_sitR1(a.TOVv)}%</td></tr>`;
   }).join('');
   return `<table class="sit-t"><thead><tr><th>Fecha</th><th style="text-align:left">Rival</th><th>Cond.</th><th>Marcador</th><th>Resultado</th><th>ORtg</th><th>DRtg</th><th>eFG%</th><th>TOV%</th></tr></thead><tbody>${filas}</tbody></table>`;
@@ -19496,7 +19523,7 @@ function _sitPbp(js) {
     const cier = { a: 0, b: 0 }, porQ = {};
     conPbp.forEach(g => { const ev = pbpEventosCrudos(g.id); if (!ev || !ev.length) return; const cs = _pbpAnalisisCuartos(ev, _pbpLadoPropio(ev, g), 120);
       Object.values(cs).forEach(c => { cier.a += c.cierre.pts.a; cier.b += c.cierre.pts.b; const k = Math.min(c.q, 5); const o = porQ[k] || (porQ[k] = { a: 0, b: 0, n: 0 }); o.a += c.cierre.pts.a; o.b += c.cierre.pts.b; o.n++; }); });
-    const _et = g => { const n = (typeof _fechaNum === 'function') ? _fechaNum(g) : 9999; return g.isPlayoff ? 'PO' : (n !== 9999 ? 'F' + n : ''); };
+    const _et = g => { const n = (typeof _fechaNum === 'function') ? _fechaNum(g) : 9999; return g.isPlayoff ? 'PO' : (n !== 9999 ? 'P' + n : ''); };
     return { n: conPbp.length, total: js.length, fechas: conPbp.map(_et).filter(Boolean).join(', '), top, mejor: rk.mejor, peor: rk.peor, ac, cierres: cier, cierresQ: porQ };
   } catch (e) { return null; }
 }
@@ -20041,7 +20068,7 @@ function _fuentesPartido(g) {
     if (ent && ent.d) acc = ent.d._origenPbp ? 'del PBP' : (ent.d._origen === 'tablero' ? 'Tablero Acciones' : (ent.d._manual ? 'carga manual' : 'planilla Excel'));
   } catch (e) {}
   const n = (typeof _fechaNum === 'function') ? _fechaNum(g) : 9999;
-  const etq = g.isPlayoff ? 'PO' : (n !== 9999 ? 'F' + n : (g.fname || ''));
+  const etq = g.isPlayoff ? 'PO' : (n !== 9999 ? 'P' + n : (g.fname || ''));
   return { fname: g.fname, etq, rival: g.rival || '', pbp, etiquetas, acc, boxOrigen: (function(){ const o = _inferirOrigenBox(lg); return !o ? 'cargado' : (o.origen === 'pbp' ? 'pbp' : 'oficial'); })(),
     boxInferido: (function(){ const o = _inferirOrigenBox(lg); return !!(o && o.inferido); })() };
 }
@@ -20305,7 +20332,7 @@ function _periodoSeleccionTxt() {
   const js = (typeof juegosParaStats === 'function') ? juegosParaStats() : [];
   const todos = (typeof ag === 'function') ? ag().filter(g => !g.scouting && !g.isPlayoff) : [];
   if (!js.length) return '';
-  const et = g => { const n = _fechaNum(g); return n !== 9999 ? 'Fecha ' + n : (g.fname||''); };
+  const et = g => { const n = _fechaNum(g); return n !== 9999 ? 'P' + n : (g.fname||''); };
   const rango = js.length === 1 ? et(js[0]) : et(js[0]) + ' a ' + et(js[js.length-1]);
   const cuales = js.length >= todos.length ? 'todos los partidos' : 'los últimos ' + js.length + ' partidos';
   return { n: js.length, txt: `${cuales} (${rango})`, esTodos: js.length >= todos.length };
@@ -20683,7 +20710,7 @@ function _mjJuegosDe(equipo, clave, nombre) {
     const sc = lado === 'A' ? [g.scoreA, g.scoreB] : [g.scoreB, g.scoreA];
     const n = _fechaNum(g);
     out.push({ g, fname: g.fname, lado, fila, rival,
-      etiqueta: (n !== 9999 ? 'Fecha ' + n : (g.fname || '')) + ' vs ' + (rival || ''),
+      etiqueta: (n !== 9999 ? 'P' + n : (g.fname || '')) + ' vs ' + (rival || ''),
       resultado: sc[0] > sc[1] ? 'G' : 'P', marcador: sc[0] + '-' + sc[1], _n: n });
   });
   return out.sort((x, y) => x._n - y._n);
@@ -20695,10 +20722,13 @@ function _mjTirosPbp(j, equipo, clave, grupo, cache, ctx) {
   let ev = cache[gid];
   if (ev === undefined) { ev = pbpEventosCrudos(gid) || null; cache[gid] = ev; }
   if (!ev || !ev.length) return null;
-  const gAg = (typeof ag === 'function') ? ag().find(x => x.fname === j.fname) : null;
-  if (!gAg) return null;                       // el PBP sólo existe en partidos del equipo propio
-  const lado = _pbpLadoPropio(ev, gAg), otro = lado === 'local' ? 'visitante' : 'local';
-  const ladoJug = _mjEsPropio(equipo) ? lado : otro;
+  // Qué lado del PBP (local/visitante) es el equipo del jugador: se deduce del box score crudo del partido
+  // (equipo A = plantel A). Antes dependía de cuál era el equipo activo de la barra: con otro equipo elegido
+  // (o en Vista general) se tomaba el lado contrario y se perdía más de la mitad de los partidos.
+  const gRaw = j.g || null;
+  if (!gRaw) return null;
+  const ladoA = _pbpLadoPropio(ev, { location: 'L', playersA: gRaw.playersA, playersB: gRaw.playersB, fname: gRaw.fname });
+  const ladoJug = j.lado === 'A' ? ladoA : (ladoA === 'local' ? 'visitante' : 'local');
   const zonas = {}; let conCoord = 0, sinCoord = 0, hayTags = false;
   ev.forEach(e => {
     if (e.equipo !== ladoJug) return;
@@ -20774,7 +20804,17 @@ function _mjSubtitulo(a, st) {
   const nP = sel.filter(f => f.fuente === 'pbp').length, nM = sel.filter(f => f.fuente === 'manual').length;
   const partes = [];
   if (nP) partes.push(nP + ' del play-by-play'); if (nM) partes.push(nM + ' de carga manual');
-  return 'Suma de <b>' + sel.length + ' partido' + (sel.length === 1 ? '' : 's') + '</b>' + (partes.length ? ' (' + partes.join(' y ') + ')' : '') + (st.jugada ? ' · solo jugada: <b>' + escHtml(st.jugada) + '</b>' : '') + '.';
+  // Cuántos partidos jugó, en cuántos no tiró al aro, en cuántos no tiene mapa y en cuántos no jugó.
+  const total = a.filas.length, jugo = a.filas.filter(f => f.fila);
+  const noTiro = jugo.filter(f => !f.zonas && f.box && f.box.i === 0).length;
+  const sinMapa = jugo.filter(f => !f.zonas && !(f.box && f.box.i === 0)).length;
+  const noJugo = total - jugo.length;
+  const pl = (n, u) => n + ' ' + u + (n === 1 ? '' : 's');
+  const mot = [];
+  if (noTiro) mot.push('en ' + pl(noTiro, 'partido') + ' estuvo en cancha pero no tomó lanzamientos');
+  if (sinMapa) mot.push(pl(sinMapa, 'partido') + ' con tiros pero sin mapa cargado');
+  let falt = ' · jugó <b>' + jugo.length + '</b> de <b>' + total + '</b> del equipo' + (mot.length ? ' (' + mot.join('; ') + ')' : '') + (noJugo ? ' · no jugó <b>' + noJugo + '</b>' : '');
+  return 'Suma de <b>' + pl(sel.length, 'partido') + '</b>' + (partes.length ? ' (' + partes.join(' y ') + ')' : '') + falt + (st.jugada ? ' · solo jugada: <b>' + escHtml(st.jugada) + '</b>' : '') + '.';
 }
 
 // ── Modal ──
@@ -27516,16 +27556,12 @@ function _cpHtmlStep4() {
       + (_cpFechaDiaTxt() ? '<div style="font-size:10.5px;color:var(--text3);margin-top:4px">jugado el ' + escHtml(_cpFechaDiaTxt()) + '</div>' : '')
       + '</div>';
   } else {
-    cintillo = '<div style="text-align:center;margin-bottom:10px"><span style="display:inline-block;background:rgba(200,134,10,.16);color:#c8860a;border:1px solid #c8860a;font-size:12px;font-weight:800;padding:4px 14px;border-radius:20px">SIN Nº DE FECHA</span></div>';
+    cintillo = '<div style="text-align:center;margin-bottom:10px"><span style="display:inline-block;background:rgba(200,134,10,.16);color:#c8860a;border:1px solid #c8860a;font-size:12px;font-weight:800;padding:4px 14px;border-radius:20px">SIN Nº DE FECHA (opcional)</span></div>';
   }
 
   // Avisos: sin fecha se pierde el orden cronológico; repetida suele ser una
   // carga duplicada o un número mal tipeado.
   var avisos = '';
-  if (!esPlayoff && fnum == null) {
-    avisos += '<div style="background:rgba(200,134,10,.12);border:1px solid #c8860a;border-radius:8px;padding:9px 12px;font-size:11px;color:#c8860a;margin-bottom:10px">'
-      + 'Falta el <b>Nº de fecha</b> (la jornada del torneo). Sin eso el partido no se puede ordenar y queda afuera del gráfico de evolución. El día del calendario no reemplaza este dato.</div>';
-  }
   if (ocupada) {
     avisos += '<div style="background:rgba(200,134,10,.12);border:1px solid #c8860a;border-radius:8px;padding:9px 12px;font-size:11px;color:#c8860a;margin-bottom:10px">'
       + 'Ya hay un partido en la <b>fecha ' + fnum + '</b> de este torneo con alguno de estos dos equipos: <b>' + escHtml(ocupada.fname) + '</b>. Revisá que no sea el mismo.</div>';
@@ -30396,7 +30432,7 @@ function rHeadToHead() {
     const etiqueta = g.esPlayoff
       ? `<span style="background:rgba(200,134,10,.16);color:#c8860a;font-size:9px;font-weight:700;padding:1px 6px;border-radius:9px;margin-right:6px">${escHtml(g.faseLabel||'Playoffs')}</span>`
       : (g.fecha != null
-          ? `<span style="background:var(--bg2);color:var(--text3);font-size:9px;font-weight:700;padding:1px 6px;border-radius:9px;margin-right:6px">F${g.fecha}</span>`
+          ? `<span style="background:var(--bg2);color:var(--text3);font-size:9px;font-weight:700;padding:1px 6px;border-radius:9px;margin-right:6px">P${g.fecha}</span>`
           : '');
     const ctx = [g.torneo, g.anio].filter(Boolean).join(' ');
     return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px;background:var(--bg3);border-radius:6px;font-size:11px">
@@ -36698,6 +36734,45 @@ window.bpGuardia = function(){
   function hay() { var c = cfg(); return !!(c && c.fixtureOficial && c.fixtureOficial.items && c.fixtureOficial.items.length); }
   function equiposLiga() { var s = {}; juegos().forEach(function (g) { if (g.teamA) s[g.teamA] = 1; if (g.teamB) s[g.teamB] = 1; }); return Object.keys(s); }
 
+  // ── Nº de partido (P) por equipo ──
+  // El orden de juego sale del DÍA (el del fixture oficial o el que se cargó a mano); sin día, del orden de
+  // carga. Los partidos jugados según el fixture que todavía no se cargaron cuentan para la numeración.
+  function _dia(g) { return esISO(g && g.fechaDia) ? g.fechaDia : ''; }
+  function _lados(g, team) { return g.location === 'V' ? [g.rival, team] : [team, g.rival]; }
+  function _puntos(g) { return g.location === 'V' ? [g.rvScore, g.vmScore] : [g.vmScore, g.rvScore]; }
+  function asignarP(arr, team) {
+    try {
+      if (!arr || !arr.length || !team) return;
+      var base = arr.map(function (g, i) { return { g: g, i: i }; }).filter(function (o) { var g = o.g; return g && !g.isPlayoff && g.fase !== 2 && !g.scouting; });
+      if (!base.length) return;
+      var c = cfg(), its = (c && c.fixtureOficial && c.fixtureOficial.items) || [], lgs = (typeof leagueGames !== 'undefined' && leagueGames) || [];
+      base.forEach(function (o) {   // el día que falta se completa desde el fixture oficial
+        var g = o.g; if (_dia(g) || !its.length) return;
+        var ab = _lados(g, team), pt = _puntos(g);
+        var cand = its.filter(function (it) { return it.d && mismo(it.l, ab[0]) && mismo(it.v, ab[1]); });
+        if (!cand.length) return;
+        var hit = cand.filter(function (it) { return it.j && it.a === pt[0] && it.b === pt[1]; })[0] || cand[0];
+        g.fechaDia = hit.d;
+        for (var i = 0; i < lgs.length; i++) if (lgs[i] && lgs[i].fname === g.fname) { if (!_dia(lgs[i])) lgs[i].fechaDia = hit.d; break; }
+      });
+      base.sort(function (a, b) { var x = _fechaNum(a.g), y = _fechaNum(b.g); return x !== y ? x - y : a.i - b.i; });
+      var pos = []; base.forEach(function (o, k) { if (_dia(o.g)) pos.push(k); });
+      var fechados = pos.map(function (k) { return base[k]; }).sort(function (a, b) { var x = _dia(a.g), y = _dia(b.g); return x < y ? -1 : x > y ? 1 : a.i - b.i; });
+      fechados.forEach(function (o, j) { base[pos[j]] = o; });   // los que tienen día se ordenan entre sí; los demás conservan su lugar
+      var sin = its.filter(function (it) {
+        if (!it.j || !it.d || !(mismo(it.l, team) || mismo(it.v, team))) return false;
+        return !base.some(function (o) { var ab = _lados(o.g, team), pt = _puntos(o.g); return mismo(it.l, ab[0]) && mismo(it.v, ab[1]) && (_dia(o.g) === it.d || (it.a === pt[0] && it.b === pt[1])); });
+      });
+      var extra = 0;
+      base.forEach(function (o, k) {
+        var d = _dia(o.g);
+        if (d) extra = sin.filter(function (it) { return it.d < d; }).length;
+        o.g.fecha = k + 1 + extra; o.g._pNum = o.g.fecha;
+      });
+    } catch (e) { console.warn('Nº de partido:', e); }
+  }
+  window._bpAsignarP = asignarP;
+
   // ── lo que consume la vista: fechas con cruces, jugados (con su box score) y pendientes ──
   function fechas() {
     var c = cfg(); if (!hay()) return null;
@@ -36783,7 +36858,7 @@ window.bpGuardia = function(){
   function sincronizarFechas() {   // los partidos ya cargados toman la fecha del fixture (ordena bien Evolución/Forma)
     var its = conFechas(cfg().fixtureOficial.items), gs = juegos(), usados = {}, n = 0;
     its.forEach(function (it) {
-      for (var i = 0; i < gs.length; i++) if (!usados[i] && mismo(it.l, gs[i].teamA) && mismo(it.v, gs[i].teamB)) { usados[i] = 1; if (gs[i].fecha !== it.fecha) { gs[i].fecha = it.fecha; n++; } break; }
+      for (var i = 0; i < gs.length; i++) if (!usados[i] && mismo(it.l, gs[i].teamA) && mismo(it.v, gs[i].teamB)) { usados[i] = 1; if (gs[i].fecha !== it.fecha) { gs[i].fecha = it.fecha; n++; } if (it.d && gs[i].fechaDia !== it.d) { gs[i].fechaDia = it.d; n++; } break; }
     });
     return n;
   }
