@@ -608,50 +608,65 @@ body.light .hm-cell{border-color:rgba(0,0,0,.1)}
 
     <!-- COMPARADOR -->
     <div id="v-cmp" class="panel">
-      <!-- Selección múltiple de jugadores -->
+      <style id="bp-cmp-css">
+        .cmpx-top{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+        .cmpx-chip{display:inline-flex;align-items:center;gap:7px;background:var(--bg3);border:1px solid var(--border2);border-radius:999px;padding:4px 6px 4px 5px;font-size:12px}
+        .cmpx-chip .av{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:9px;font-weight:800;color:#04210f;flex:none}
+        .cmpx-chip button{background:none;border:0;color:var(--text3);cursor:pointer;font-size:15px;line-height:1;padding:0 5px}
+        .cmpx-search{position:relative}
+        .cmpx-search input{padding:7px 12px;background:transparent;border:1px dashed var(--border2);border-radius:999px;color:var(--text);font-size:12px;outline:none;min-width:200px}
+        .cmpx-search input:focus{border-style:solid;border-color:var(--green)}
+        .cmpx-res{display:none;position:absolute;top:100%;left:0;margin-top:4px;z-index:300;background:var(--bg2);border:1px solid var(--border2);border-radius:10px;min-width:280px;max-height:320px;overflow-y:auto;padding:4px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+        .cmpx-res div{display:flex;justify-content:space-between;gap:12px;padding:7px 10px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--text)}
+        .cmpx-res div:hover{background:var(--bg3)}.cmpx-res small{color:var(--text3);font-size:10px}
+        .cmpx-seg{display:inline-flex;border:1px solid var(--border2);border-radius:8px;overflow:hidden;margin-left:auto}
+        .cmpx-seg button{background:var(--bg3);border:0;color:var(--text3);font-size:11px;padding:6px 11px;cursor:pointer}
+        .cmpx-seg button.on{background:var(--green);color:#04210f;font-weight:700}
+        .cmpx-head{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center;margin-bottom:6px}
+        .cmpx-pl{display:flex;gap:10px;align-items:center;min-width:0}.cmpx-pl.r{flex-direction:row-reverse;text-align:right}
+        .cmpx-big{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;font-weight:800;color:#04210f;flex:none;background-size:cover;background-position:center}
+        .cmpx-pl b{display:block;font-size:15px;color:var(--text)}.cmpx-pl small{color:var(--text3);font-size:11px}
+        .cmpx-vs{color:var(--text3);font-size:11px;font-weight:700;letter-spacing:.1em}
+        .cmpx-val{display:flex;gap:10px;margin:10px 0 4px}
+        .cmpx-val>div{flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:8px 12px}
+        .cmpx-val .n{font-size:26px;font-weight:800;line-height:1}.cmpx-val small{color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.05em}
+        .cmpx-h4{margin:14px 0 2px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);font-weight:700}
+        .cmpx-row{display:grid;grid-template-columns:64px 1fr 64px;gap:8px;align-items:center;padding:4px 0}
+        .cmpx-v{font-size:13px;font-variant-numeric:tabular-nums;color:var(--text3)}.cmpx-v.l{text-align:right}.cmpx-v.win{color:var(--text);font-weight:800}
+        .cmpx-bars{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center}
+        .cmpx-half{height:10px;background:var(--bg3);border-radius:5px;display:flex;overflow:hidden}.cmpx-half i{display:block;height:100%}.cmpx-half.lft{justify-content:flex-end}
+        .cmpx-lab{font-size:11px;color:var(--text3);min-width:92px;text-align:center}.cmpx-lab em{display:block;font-style:normal;font-size:9px;opacity:.75}
+        .cmpx-read{border-left:4px solid var(--green);background:var(--bg3);padding:10px 14px;border-radius:4px;margin-top:10px;font-size:12px;line-height:1.5;color:var(--text)}.cmpx-read b{color:var(--green)}
+        .cmpx-warn{display:inline-block;background:rgba(245,165,36,.18);color:#d99a1f;border-radius:4px;padding:1px 6px;font-size:10px;margin-top:3px}
+        table.cmpx-t{border-collapse:collapse;width:100%;min-width:520px;font-size:12px;font-variant-numeric:tabular-nums}
+        .cmpx-t th{text-align:center;padding:8px;border-bottom:3px solid;font-size:12px;color:var(--text)}.cmpx-t th small{display:block;color:var(--text3);font-weight:400;font-size:10px}
+        .cmpx-t th:first-child,.cmpx-t td:first-child{text-align:left;position:sticky;left:0;background:var(--bg2);z-index:1}
+        .cmpx-t td{text-align:center;padding:5px 8px;border-bottom:1px solid var(--bg2)}.cmpx-t td b{display:block;font-size:13px;color:var(--text)}.cmpx-t td span{font-size:9px;color:var(--text3)}
+        .cmpx-t tr.g td{background:none!important;text-align:left;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);padding-top:11px;font-weight:700}
+        .cmpx-leg{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--text3);margin-top:10px}.cmpx-leg i{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:-2px;margin-right:5px}
+        .cmpx-two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;align-items:center}
+        .cmpx-stack{display:flex;height:20px;border-radius:5px;overflow:hidden;margin:6px 0 4px;background:var(--bg3)}.cmpx-stack i{display:block;height:100%}
+        .cmpx-cl{font-size:11px;color:var(--text3);display:flex;gap:12px;flex-wrap:wrap}.cmpx-cl i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px}
+        @media(max-width:700px){.cmpx-two{grid-template-columns:1fr}}
+        @media(max-width:520px){.cmpx-row{grid-template-columns:46px 1fr 46px}.cmpx-lab{min-width:66px;font-size:10px}.cmpx-head{grid-template-columns:1fr}.cmpx-vs{display:none}.cmpx-pl.r{flex-direction:row;text-align:left}.cmpx-seg{margin-left:0}}
+      </style>
       <div class="card" style="margin-bottom:14px">
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px">
-          <div class="card-t" style="margin:0">Jugadores a comparar</div>
-          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-            <select id="cmpAddTeam" onchange="cmpRenderAddList()" style="padding:5px 8px;background:var(--bg3);border:1px solid var(--border2);color:var(--text);font-size:11px;border-radius:6px;outline:none"></select>
-            <select id="cmpAddPlayer" style="padding:5px 8px;background:var(--bg3);border:1px solid var(--border2);color:var(--text);font-size:11px;border-radius:6px;outline:none;max-width:170px"></select>
-            <button class="btn btn-sm btn-g" onclick="cmpAddSelected()">+ Agregar</button>
-            <button class="btn btn-sm" onclick="cmpClearAll()" style="font-size:11px">Limpiar</button>
+        <div class="cmpx-top">
+          <div id="cmp-chips" style="display:contents"></div>
+          <div class="cmpx-search">
+            <input id="cmpSearch" type="search" placeholder="+ Buscar jugador o equipo" autocomplete="off" aria-label="Buscar jugador" oninput="cmpBuscar()" onfocus="cmpBuscar()">
+            <div id="cmpResults" class="cmpx-res"></div>
+          </div>
+          <button class="btn btn-sm" onclick="cmpClearAll()" style="font-size:11px">Limpiar</button>
+          <div class="cmpx-seg" role="group" aria-label="Modo de lectura">
+            <button id="cmpm-prom" class="on" onclick="setCmpMode('prom')">Promedio</button>
+            <button id="cmpm-acum" onclick="setCmpMode('acum')">Acumulado</button>
+            <button id="cmpm-36" onclick="setCmpMode('36')" title="Estadísticas llevadas a 36 minutos para comparar jugadores con distinto tiempo de juego">Cada 36 min</button>
           </div>
         </div>
-        <div id="cmp-chips" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+        <div id="cmp-nota" style="font-size:11px;color:var(--text3);margin-top:8px"></div>
       </div>
-      <!-- TARJETAS dinámicas por jugador -->
-      <div id="cmpCards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:16px"></div>
-      <!-- Selector de métricas a comparar -->
-      <div class="card" style="margin-bottom:14px">
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px">
-          <div class="card-t" style="margin:0">Tabla comparativa</div>
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <span style="font-size:11px;color:var(--text3)">Métricas:</span>
-            <div style="position:relative;display:inline-block">
-              <button class="btn btn-sm" id="cmp-chart-btn" onclick="toggleCmpChartDropdown()" style="min-width:150px;display:flex;align-items:center;justify-content:space-between;gap:6px">
-                <span id="cmp-chart-label">VAL, PTS, REB, AST</span>
-                <span style="font-size:9px">▼</span>
-              </button>
-              <div id="cmp-chart-dropdown" style="display:none;position:absolute;top:100%;right:0;z-index:200;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:6px;min-width:220px;max-height:300px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.3);margin-top:4px">
-                <div style="display:flex;gap:6px;margin-bottom:6px;padding-bottom:6px;border-bottom:0.5px solid var(--border)">
-                  <button class="btn btn-sm btn-g" style="flex:1;font-size:10px" onclick="setCmpChartAll(true)">Todas</button>
-                  <button class="btn btn-sm" style="flex:1;font-size:10px" onclick="setCmpChartAll(false)">Limpiar</button>
-                </div>
-                <div id="cmp-chart-checks"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <!-- TABLA detallada con mejor valor resaltado -->
-        <div id="cmpTabla" style="overflow-x:auto"></div>
-      </div>
-      <!-- Gráficos comparativos -->
-      <div class="card" style="margin-bottom:14px">
-        <div class="card-t">Gráficos comparativos</div>
-        <div id="cmp-charts-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px"></div>
-      </div>
+      <div id="cmpVista"></div>
       <!-- Comparador de mapas de tiro (equipos) -->
       <div class="card" style="margin-bottom:14px">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:4px">
@@ -8304,7 +8319,7 @@ function _verMapaTirosImprimir() {
   if (!html) return;
   const w = window.open('', '_blank');
   if (!w) { alert('Permití las ventanas emergentes para imprimir.'); return; }
-  w.document.open(); w.document.write(html); w.document.close();
+  w.document.open(); w.document.write(typeof bpFemHtml === "function" ? bpFemHtml(html) : html); w.document.close();
   setTimeout(()=>{ try { w.focus(); w.print(); } catch(e){} }, 500);
 }
 
@@ -10414,13 +10429,6 @@ var cmpMode = 'prom'; // 'prom' | 'acum'
 const CMP_PROM_ONLY = new Set(['eFG','TS','usg','ast','tovPct','orebPct','drebPct','tpar','ftr','perAdv','bpm','TC2pct','TC3pct','TLpct','PM']);
 const CMP_ACUM_ONLY = new Set(['TC2m','TC2i','TC3m','TC3i','TLm','TLi','REB_O','REB_D','FC','FR']);
 
-function setCmpMode(m) {
-  cmpMode = m;
-  document.getElementById('cmptab-prom').classList.toggle('on', m==='prom');
-  document.getElementById('cmptab-acum').classList.toggle('on', m==='acum');
-  rCmp();
-}
-
 function getVal(p, k) {
   if (CMP_PROM_ONLY.has(k)) return p.prom[k] !== undefined ? (p.prom[k]||0) : 0;
   if (CMP_ACUM_ONLY.has(k)) {
@@ -10528,6 +10536,7 @@ let cmpSel = []; // [{name, team}] jugadores elegidos
 // Métricas comparables (clave, etiqueta, mejor=alto?, formato)
 
 function initCmp() {
+  _cmpIdx = null; _cmpMapCache = {};
   // Poblar selector de equipos y lista de jugadores.
   const teams = getCmpAllTeams();
   const teamSel = document.getElementById('cmpAddTeam');
@@ -10582,32 +10591,338 @@ function cmpClearAll() {
   rCmp();
 }
 
-// Chips con los jugadores elegidos (cada uno con su color y botón quitar).
-function cmpRenderChips() {
-  const el = document.getElementById('cmp-chips');
-  if (!el) return;
-  if (!cmpSel.length) { el.innerHTML = '<span style="font-size:12px;color:var(--text3)">Agregá jugadores para comparar.</span>'; return; }
-  el.innerHTML = cmpSel.map((c,i)=>{
-    const col = PAL[i%PAL.length];
-    return `<span style="display:inline-flex;align-items:center;gap:6px;background:var(--bg3);border:1px solid ${col};border-radius:20px;padding:3px 6px 3px 10px;font-size:11px">
-      <span style="width:8px;height:8px;border-radius:50%;background:${col}"></span>
-      <b style="color:var(--text)">${sn(c.name)}</b>
-      <span style="color:var(--text3);font-size:9px">${c.team!==activeTeamName()?abbrFor(c.team):''}</span>
-      <button onclick="cmpRemove('${c.name.replace(/'/g,"\\'")}','${c.team.replace(/'/g,"\\'")}')" style="border:none;background:none;color:var(--text3);cursor:pointer;font-size:13px;line-height:1;padding:0 2px">×</button>
-    </span>`;
-  }).join('');
-}
-
 // Obtiene el objeto de datos de un jugador elegido.
 function cmpGetPlayer(c) {
   const list = getCmpPlayersForTeam(c.team);
   return list.find(p=>p.name===c.name) || null;
 }
 
+// ═════════════════════════════════════════════════════════════════════
+// COMPARADOR (v94): búsqueda única · cara a cara (2) · tabla contra la liga (3-5) · perfil
+// ═════════════════════════════════════════════════════════════════════
+var cmpModo = 'prom';            // 'prom' | 'acum' | '36'
+var cmpVerTodas = false;
+var CMP_MAX = 5;
+var CMP_CONT = ['PTS','REB','AST','REC','PER','TAP','VAL','REB_O','REB_D','TC2m','TC2i','TC3m','TC3i','TLm','TLi'];
+var CMP_TIRO = {TC2pct:'TC2i', TC3pct:'TC3i', TLpct:'TLi'};
+var _cmpIdx = null;
+
+function _cmpNum(v) { return (typeof v === 'number' && !isNaN(v)) ? v : null; }
+function _cmpSinAcento(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+
+// Normaliza un jugador (propio, de otro equipo o del pool de la liga) a {name, pg, pr, tot}.
+function cmpNorm(p) {
+  const pr = p.prom || {};
+  const pg = p.pg || pr.games || 0;
+  const tot = p._isLeague ? (pr._tot || {}) : (p.acum || {});
+  return { name: p.name, pg: pg, pr: pr, tot: tot };
+}
+
+// Valor de una métrica según el modo. Porcentajes y avanzadas siempre son promedio.
+function cmpV(d, k, modo) {
+  if (CMP_TIRO[k]) { if (d.tot[CMP_TIRO[k]] === 0) return null; return _cmpNum(d.pr[k]); }
+  if (CMP_CONT.indexOf(k) < 0) return _cmpNum(d.pr[k]);
+  const soloAcum = CMP_ACUM_ONLY.has(k);
+  if (modo === 'prom' && !soloAcum) { const v = _cmpNum(d.pr[k]); if (v !== null) return v; }
+  let t = _cmpNum(d.tot[k]);
+  if (t === null) { const v = _cmpNum(d.pr[k]); if (v !== null && d.pg) t = v * d.pg; }
+  if (t === null) return null;
+  if (modo === 'acum') return t;
+  if (modo === '36') { const mt = (d.pr.MIN || 0) * d.pg; return mt > 0 ? t / mt * 36 : null; }
+  return d.pg ? t / d.pg : null;
+}
+
+// Percentil dentro de la liga (jugadores con 3+ PJ y 10+ min). Siempre "mejor que X%".
+function cmpPct(v, k, modo, alto, poolN) {
+  if (v === null) return null;
+  const vals = [];
+  poolN.forEach(d => { const x = cmpV(d, k, modo); if (x !== null) vals.push(x); });
+  if (vals.length < 8) return null;
+  if (Math.max.apply(null, vals) === Math.min.apply(null, vals)) return null;
+  const peores = vals.filter(x => alto ? x < v : x > v).length;
+  return Math.max(0, Math.min(100, Math.round(peores / (vals.length - 1) * 100)));
+}
+
+function cmpFmt(v, k, modo) {
+  if (v === null) return CMP_TIRO[k] ? 'sin intentos' : '—';
+  const m = CMP_METRICS.find(x => x.k === k);
+  const esPct = !!m && _cmpEsPct(m);
+  const entero = (modo === 'acum' && CMP_CONT.indexOf(k) >= 0);
+  const s = entero ? String(Math.round(v)) : String(f1(v));
+  return esPct ? s + '%' : s;
+}
+
+function cmpAvisos(d) {
+  const a = [];
+  if (d.pg < 5) a.push('pocos partidos');
+  if ((d.pr.MIN || 0) < 12) a.push('pocos minutos');
+  return a;
+}
+
+function cmpIniciales(n) {
+  return String(n || '').split(',').map(s => s.trim()[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '?';
+}
+
+// Busca al jugador en la tabla de la liga (mismos datos que el percentil: TS, USG, totales). Si no está, usa el listado del comparador.
+function cmpFuente(c) {
+  try {
+    const j = _infGetJugadoresLiga().find(x => x.name === c.name && teamNameMatch(x.team, c.team));
+    if (j && j.prom && j.acum) return { name: j.name, pg: j.pg, prom: j.prom, acum: j.acum };
+  } catch (e) {}
+  return cmpGetPlayer(c);
+}
+function cmpDatos() {
+  return cmpSel.map((c, i) => {
+    const p = cmpFuente(c); if (!p) return null;
+    const d = cmpNorm(p);
+    d.col = PAL[i % PAL.length]; d.team = c.team; d.nom = sn(p.name);
+    return d;
+  }).filter(Boolean);
+}
+
+// ── Búsqueda única ──
+function cmpIndice() {
+  if (_cmpIdx) return _cmpIdx;
+  const out = [], vistos = new Set();
+  getCmpAllTeams().forEach(t => {
+    getCmpPlayersForTeam(t).forEach(p => {
+      const eq = p._isLeague ? (p._team || t) : t;
+      const key = p.name + '|' + eq;
+      if (vistos.has(key)) return;
+      vistos.add(key);
+      out.push({ name: p.name, team: eq, pg: p.pg, val: (p.prom || {}).VAL });
+    });
+  });
+  _cmpIdx = out; return out;
+}
+function cmpBuscar() {
+  const inp = document.getElementById('cmpSearch'), box = document.getElementById('cmpResults');
+  if (!inp || !box) return;
+  const q = _cmpSinAcento(inp.value).trim();
+  const ya = new Set(cmpSel.map(c => c.name + '|' + c.team));
+  let r = cmpIndice().filter(x => !ya.has(x.name + '|' + x.team));
+  if (q) r = r.filter(x => _cmpSinAcento(x.name + ' ' + x.team).indexOf(q) >= 0);
+  const total = r.length;
+  r = r.slice(0, 12);
+  if (cmpSel.length >= CMP_MAX) {
+    box.innerHTML = '<div style="cursor:default"><small>Máximo ' + CMP_MAX + ' jugadores. Quitá uno para agregar otro.</small></div>';
+  } else if (!r.length) {
+    box.innerHTML = '<div style="cursor:default"><small>No hay jugadores con ese nombre.</small></div>';
+  } else {
+    box.innerHTML = r.map(x => '<div data-n="' + escHtml(x.name) + '" data-t="' + escHtml(x.team) + '" onmousedown="cmpElegir(this)"><span>' + escHtml(sn(x.name)) + '</span><small>' + escHtml(x.team) + ' · ' + (x.pg || 0) + ' PJ</small></div>').join('')
+      + (total > r.length ? '<div style="cursor:default"><small>Hay ' + (total - r.length) + ' más. Escribí para filtrar.</small></div>' : '');
+  }
+  box.style.display = 'block';
+}
+function cmpElegir(el) {
+  const n = el.getAttribute('data-n'), t = el.getAttribute('data-t');
+  if (cmpSel.length >= CMP_MAX || cmpSel.some(c => c.name === n && c.team === t)) return;
+  cmpSel.push({ name: n, team: t });
+  const inp = document.getElementById('cmpSearch'); if (inp) inp.value = '';
+  const box = document.getElementById('cmpResults'); if (box) box.style.display = 'none';
+  cmpRenderChips(); rCmp();
+}
+document.addEventListener('click', function (e) {
+  const box = document.getElementById('cmpResults');
+  if (box && !e.target.closest('.cmpx-search')) box.style.display = 'none';
+});
+
+function cmpRenderChips() {
+  const el = document.getElementById('cmp-chips');
+  if (!el) return;
+  el.innerHTML = cmpSel.map((c, i) => {
+    const col = PAL[i % PAL.length];
+    return '<span class="cmpx-chip" style="border-color:' + col + '"><span class="av" style="background:' + col + '">' + escHtml(cmpIniciales(c.name)) + '</span>'
+      + '<b>' + escHtml(sn(c.name)) + '</b><span style="color:var(--text3);font-size:10px">' + escHtml(c.team !== activeTeamName() ? abbrFor(c.team) : '') + '</span>'
+      + '<button type="button" aria-label="Quitar" data-n="' + escHtml(c.name) + '" data-t="' + escHtml(c.team) + '" onclick="cmpRemove(this.getAttribute(\'data-n\'),this.getAttribute(\'data-t\'))">×</button></span>';
+  }).join('');
+}
+
+function setCmpMode(m) {
+  cmpModo = m; cmpMode = (m === 'acum') ? 'acum' : 'prom';
+  ['prom', 'acum', '36'].forEach(k => { const b = document.getElementById('cmpm-' + k); if (b) b.classList.toggle('on', k === m); });
+  rCmp();
+}
+
+// ── Cara a cara (2 jugadores) ──
+function cmpGana(va, vb, k, alto, modo) {
+  if (va === null || vb === null) return 0;
+  const m = CMP_METRICS.find(x => x.k === k), esPct = !!m && _cmpEsPct(m);
+  const dif = Math.abs(va - vb);
+  const umbral = esPct ? 1.5 : Math.max(0.05 * Math.max(Math.abs(va), Math.abs(vb)), modo === 'acum' ? 1 : 0.15);
+  if (dif < umbral) return 0;
+  return (alto ? va > vb : va < vb) ? 1 : -1;
+}
+function cmpFilaDuelo(a, b, k, label, alto, modo, nota) {
+  const va = cmpV(a, k, modo), vb = cmpV(b, k, modo);
+  const g = cmpGana(va, vb, k, alto, modo);
+  const mx = Math.max(va || 0, vb || 0, 0.0001);
+  const wa = va > 0 ? Math.max(3, va / mx * 100) : 0, wb = vb > 0 ? Math.max(3, vb / mx * 100) : 0;
+  return '<div class="cmpx-row"><div class="cmpx-v l' + (g === 1 ? ' win' : '') + '">' + cmpFmt(va, k, modo) + '</div>'
+    + '<div class="cmpx-bars"><div class="cmpx-half lft"><i style="width:' + wa.toFixed(0) + '%;background:' + a.col + (g === 1 ? '' : '88') + '"></i></div>'
+    + '<span class="cmpx-lab">' + label + (nota ? '<em>' + nota + '</em>' : '') + '</span>'
+    + '<div class="cmpx-half"><i style="width:' + wb.toFixed(0) + '%;background:' + b.col + (g === -1 ? '' : '88') + '"></i></div></div>'
+    + '<div class="cmpx-v' + (g === -1 ? ' win' : '') + '">' + cmpFmt(vb, k, modo) + '</div></div>';
+}
+function cmpLectura(a, b, modo) {
+  const reglas = [
+    ['PTS', true, (f, o) => 'anota más (' + f + ' vs ' + o + ')'],
+    ['TS', true, (f, o) => 'con mejor eficiencia (TS ' + f + ' vs ' + o + ')'],
+    ['REB', true, (f, o) => 'domina el rebote (' + f + ' vs ' + o + ')'],
+    ['AST', true, (f, o) => 'crea más (' + f + ' vs ' + o + ' asistencias)'],
+    ['PER', false, () => 'pierde menos balones'],
+    ['REC', true, () => 'recupera más']
+  ];
+  const fr = [[], []];
+  reglas.forEach(r => {
+    const va = cmpV(a, r[0], modo), vb = cmpV(b, r[0], modo), g = cmpGana(va, vb, r[0], r[1], modo);
+    if (g === 1) fr[0].push(r[2](cmpFmt(va, r[0], modo), cmpFmt(vb, r[0], modo)));
+    if (g === -1) fr[1].push(r[2](cmpFmt(vb, r[0], modo), cmpFmt(va, r[0], modo)));
+  });
+  const unir = l => l.length < 2 ? l.join('') : l.slice(0, -1).join(', ') + ' y ' + l[l.length - 1];
+  const partes = [];
+  [a, b].forEach((d, i) => { if (fr[i].length) partes.push('<b>' + escHtml(d.nom) + '</b> ' + unir(fr[i]) + '.'); });
+  [[a, b], [b, a]].forEach(par => {
+    const x = par[0], y = par[1];
+    const i3 = x.tot.TC3i, m3 = x.tot.TC3m;
+    if (i3 > 0 && y.tot.TC3i === 0) partes.push('<b>' + escHtml(x.nom) + '</b> es ' + (bpEsFem() ? 'la única de las dos' : 'el único de los dos') + ' que tira de tres (' + m3 + ' de ' + i3 + ', ' + f1(m3 / i3 * 100) + '%).');
+  });
+  return partes.length ? partes.join(' ') : 'Perfiles muy parejos en estas métricas.';
+}
+function cmpHtmlDuelo(ds, poolN) {
+  const a = ds[0], b = ds[1], modo = cmpModo;
+  const nota = modo === 'prom' ? 'por partido' : (modo === 'acum' ? 'total' : 'cada 36 min');
+  const head = d => {
+    const foto = (typeof playerPhotos !== 'undefined') ? playerPhotos[d.name] : null;
+    return foto ? '<div class="cmpx-big" style="background-image:url(' + foto + ');border:2px solid ' + d.col + '"></div>'
+                : '<div class="cmpx-big" style="background:' + d.col + '">' + escHtml(cmpIniciales(d.name)) + '</div>';
+  };
+  const sub = d => d.pg + ' PJ · ' + f1(d.pr.MIN || 0) + ' min' + (d.team !== activeTeamName() ? ' · ' + escHtml(d.team) : '') + cmpAvisos(d).map(w => ' <span class="cmpx-warn">' + w + '</span>').join('');
+  const va = cmpV(a, 'VAL', modo), vb = cmpV(b, 'VAL', modo);
+  const pa = cmpPct(va, 'VAL', modo, true, poolN), pb = cmpPct(vb, 'VAL', modo, true, poolN);
+  const bloqueVal = (d, v, p) => '<div><div class="n" style="color:' + d.col + '">' + cmpFmt(v, 'VAL', modo) + '</div><small>Valoración' + (p !== null ? ' · mejor que el ' + p + '% de la liga' : '') + '</small></div>';
+  let h = '<div class="card" style="margin-bottom:14px"><div class="cmpx-head"><div class="cmpx-pl">' + head(a) + '<div><b>' + escHtml(a.nom) + '</b><small>' + sub(a) + '</small></div></div><span class="cmpx-vs">VS</span>'
+    + '<div class="cmpx-pl r">' + head(b) + '<div><b>' + escHtml(b.nom) + '</b><small>' + sub(b) + '</small></div></div></div>'
+    + '<div class="cmpx-val">' + bloqueVal(a, va, pa) + bloqueVal(b, vb, pb).replace('<div>', '<div style="text-align:right">') + '</div>';
+  h += '<div class="cmpx-h4">Anotación</div>' + cmpFilaDuelo(a, b, 'PTS', 'Puntos', true, modo) + cmpFilaDuelo(a, b, 'TLm', 'Tiros libres anotados', true, modo, nota);
+  h += '<div class="cmpx-h4">Eficiencia</div>' + cmpFilaDuelo(a, b, 'TS', 'TS%', true, modo) + cmpFilaDuelo(a, b, 'TC2pct', '%2P', true, modo) + cmpFilaDuelo(a, b, 'TC3pct', '%3P', true, modo);
+  h += '<div class="cmpx-h4">Creación y balón</div>' + cmpFilaDuelo(a, b, 'AST', 'Asistencias', true, modo) + cmpFilaDuelo(a, b, 'PER', 'Pérdidas', false, modo);
+  h += '<div class="cmpx-h4">Rebote y defensa</div>' + cmpFilaDuelo(a, b, 'REB', 'Rebotes', true, modo) + cmpFilaDuelo(a, b, 'REC', 'Recuperos', true, modo);
+  h += '<div class="cmpx-read"><b>Lectura.</b> ' + cmpLectura(a, b, modo) + '</div></div>';
+  return h;
+}
+
+// ── Tabla contra la liga (3 a 5 jugadores) ──
+function cmpHtmlTabla(ds, poolN) {
+  const modo = cmpModo;
+  let grupos;
+  if (cmpVerTodas) {
+    grupos = []; const idx = {};
+    CMP_METRICS.forEach(m => { if (!idx[m.g]) { idx[m.g] = [m.g, []]; grupos.push(idx[m.g]); } idx[m.g][1].push([m.k, m.l, m.h]); });
+  } else {
+    grupos = [['Anotación', [['PTS', 'Puntos', true], ['usg', 'USG%', true]]], ['Eficiencia', [['TS', 'TS%', true], ['eFG', 'eFG%', true]]],
+      ['Creación y balón', [['AST', 'Asistencias', true], ['PER', 'Pérdidas', false]]], ['Rebote y defensa', [['REB', 'Rebotes', true], ['REC', 'Recuperos', true]]], ['Global', [['VAL', 'Valoración', true]]]];
+  }
+  const calor = p => { const a = 0.10 + 0.55 * Math.abs(p - 50) / 50; return 'background:rgba(' + (p >= 50 ? '61,220,132' : '255,107,92') + ',' + a.toFixed(2) + ')'; };
+  let h = '<div class="card" style="margin-bottom:14px"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px"><div class="card-t" style="margin:0">Comparación contra la liga</div>'
+    + '<button class="btn btn-sm" style="margin-left:auto;font-size:11px" onclick="cmpVerTodas=!cmpVerTodas;rCmp()">' + (cmpVerTodas ? 'Ver menos métricas' : 'Ver todas las métricas') + '</button></div>'
+    + '<div style="overflow-x:auto;border-radius:8px"><table class="cmpx-t"><thead><tr><th style="border-bottom-color:var(--border)">Métrica</th>'
+    + ds.map(d => '<th style="border-bottom-color:' + d.col + '">' + escHtml(d.nom) + '<small>' + d.pg + ' PJ · ' + f1(d.pr.MIN || 0) + ' min</small>' + cmpAvisos(d).map(w => '<span class="cmpx-warn">' + w + '</span>').join(' ') + '</th>').join('')
+    + '</tr></thead><tbody>';
+  grupos.forEach(g => {
+    h += '<tr class="g"><td colspan="' + (ds.length + 1) + '">' + g[0] + '</td></tr>';
+    g[1].forEach(f => {
+      h += '<tr><td>' + f[1] + '</td>';
+      ds.forEach(d => {
+        const v = cmpV(d, f[0], modo), p = cmpPct(v, f[0], modo, f[2], poolN);
+        h += '<td' + (p !== null ? ' style="' + calor(p) + '"' : '') + '><b>' + cmpFmt(v, f[0], modo) + '</b>' + (p !== null ? '<span>P' + p + '</span>' : '') + '</td>';
+      });
+      h += '</tr>';
+    });
+  });
+  h += '</tbody></table></div><div class="cmpx-leg"><span><i style="background:rgba(255,107,92,.6)"></i>por debajo de la mediana</span><span><i style="background:rgba(61,220,132,.6)"></i>por encima de la mediana</span>'
+    + '<span>P90 = mejor que el 90% de la liga</span><span>En pérdidas, un percentil alto es tener pocas</span></div>'
+    + '<div style="font-size:10px;color:var(--text3);margin-top:6px">Liga: ' + poolN.length + ' jugadores con 3 o más partidos y 10 minutos o más.' + (modo === 'acum' ? ' Los porcentajes y las avanzadas siempre se muestran como promedio.' : '') + '</div></div>';
+  return h;
+}
+
+// ── Perfil (radar por percentil) + origen de los puntos ──
+function cmpSvgRadar(ds, poolN) {
+  const ejes = [['PTS', 'Anotación', true], ['TS', 'Eficiencia', true], ['AST', 'Creación', true], ['REB', 'Rebote', true], ['REC', 'Recuperos', true], ['PER', 'Cuidado de balón', false]];
+  const cx = 130, cy = 130, R = 96, n = ejes.length;
+  const pt = (i, v) => { const a = -Math.PI / 2 + i * 2 * Math.PI / n, r = R * v / 100; return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; };
+  const pts = arr => arr.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+  let s = '<svg viewBox="-50 0 360 280" role="img" aria-label="Perfil por percentil de la liga" style="width:100%;max-width:400px;height:auto"><g transform="translate(0,6)">';
+  [25, 50, 75, 100].forEach(v => { s += '<polygon points="' + pts(ejes.map((_, i) => pt(i, v))) + '" fill="none" stroke="var(--border)" stroke-width="1"/>'; });
+  ejes.forEach((_, i) => { const q = pt(i, 100); s += '<line x1="' + cx + '" y1="' + cy + '" x2="' + q[0].toFixed(1) + '" y2="' + q[1].toFixed(1) + '" stroke="var(--border)"/>'; });
+  ds.forEach(d => {
+    const vals = ejes.map(e => { const p = cmpPct(cmpV(d, e[0], cmpModo), e[0], cmpModo, e[2], poolN); return p === null ? 0 : p; });
+    s += '<polygon points="' + pts(vals.map((v, i) => pt(i, v))) + '" fill="' + d.col + '33" stroke="' + d.col + '" stroke-width="2"/>';
+  });
+  ejes.forEach((e, i) => { const q = pt(i, 122), anc = Math.abs(q[0] - cx) < 10 ? 'middle' : (q[0] > cx ? 'start' : 'end'); s += '<text x="' + q[0].toFixed(1) + '" y="' + (q[1] + 4).toFixed(1) + '" text-anchor="' + anc + '" font-size="11" fill="var(--text3)">' + e[1] + '</text>'; });
+  return s + '</g></svg>';
+}
+function cmpHtmlPerfil(ds, poolN) {
+  const C2 = '#2f7f6f', C3 = '#d69e2e', CL = '#9b3d52';
+  const filas = ds.map(d => {
+    const p2 = 2 * (d.tot.TC2m || 0), p3 = 3 * (d.tot.TC3m || 0), tl = d.tot.TLm || 0, tot = p2 + p3 + tl;
+    if (!tot) return '<div style="margin-top:12px;font-size:12px;color:var(--text3)"><b style="color:' + d.col + '">' + escHtml(d.nom) + '</b>: sin datos de tiros.</div>';
+    const pc = v => (v / tot * 100);
+    return '<div style="margin-top:14px"><div style="display:flex;justify-content:space-between;font-size:12px;gap:8px"><b style="color:' + d.col + '">' + escHtml(d.nom) + '</b><span style="color:var(--text3)">' + tot + ' pts en ' + d.pg + ' partidos</span></div>'
+      + '<div class="cmpx-stack"><i style="width:' + pc(p2).toFixed(1) + '%;background:' + C2 + '"></i><i style="width:' + pc(p3).toFixed(1) + '%;background:' + C3 + '"></i><i style="width:' + pc(tl).toFixed(1) + '%;background:' + CL + '"></i></div>'
+      + '<div class="cmpx-cl"><span><i style="background:' + C2 + '"></i>2P ' + p2 + ' (' + Math.round(pc(p2)) + '%)</span><span><i style="background:' + C3 + '"></i>3P ' + p3 + ' (' + Math.round(pc(p3)) + '%)</span><span><i style="background:' + CL + '"></i>TL ' + tl + ' (' + Math.round(pc(tl)) + '%)</span></div></div>';
+  }).join('');
+  const leyenda = ds.map(d => '<span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--text)"><i style="width:10px;height:10px;border-radius:2px;background:' + d.col + '"></i>' + escHtml(d.nom) + '</span>').join('');
+  return '<div class="card" style="margin-bottom:14px"><div class="card-t">Perfil y origen de los puntos</div>'
+    + '<div class="cmpx-two"><div style="display:flex;flex-direction:column;align-items:center;gap:6px">' + cmpSvgRadar(ds, poolN) + '<div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">' + leyenda + '</div>'
+    + '<div style="font-size:10px;color:var(--text3);text-align:center">El área muestra el percentil en la liga en cada aspecto. Cuanto más lejos del centro, mejor que más jugadores de la liga.</div></div>'
+    + '<div><div style="font-size:13px;font-weight:700;color:var(--text)">Cómo se arman los puntos</div>' + filas + '</div></div>'
+    + '</div>';
+}
+
+// ── Mapas de tiro de cada jugador elegido (mismo cálculo que el mapa de tiro del perfil) ──
+var _cmpMapCache = {};
+function cmpMapaJugador(d) {
+  const key = d.name + '|' + d.team;
+  if (_cmpMapCache[key]) return _cmpMapCache[key];
+  let h = '';
+  try {
+    const st = { clave: _mjClave(d.name), nombre: d.name, equipo: d.team, sel: new Set(), jugada: '', editando: null, cacheEv: {}, ed: null };
+    const a0 = _mjAnalizar(st);
+    st.sel = new Set(a0.filas.filter(f => f.fuente).map(f => f.fname));
+    const a = _mjAnalizar(st);
+    const sub = _mjSubtitulo(a, st);
+    if (_mjSumaZonas(a.total).i > 0) h = _svgMapaZonasDe(a.total, '🎯 ' + escHtml(d.nom), sub, { ancho: 340 });
+    else h = '<div style="padding:18px;text-align:center;color:var(--text3);font-size:12px;border:1px dashed var(--border2);border-radius:10px"><b style="color:var(--text)">' + escHtml(d.nom) + '</b><br>Sin tiros ubicados todavía.<br><span style="font-size:11px">' + sub + '</span></div>';
+  } catch (e) { h = '<div style="padding:18px;color:var(--text3);font-size:12px">No se pudo armar el mapa de ' + escHtml(d.nom) + '.</div>'; }
+  _cmpMapCache[key] = h;
+  return h;
+}
+function cmpHtmlMapas(ds) {
+  const celdas = ds.map(d => '<div style="min-width:0"><div style="border-top:3px solid ' + d.col + ';border-radius:2px;margin-bottom:6px"></div>' + cmpMapaJugador(d)
+    + '<div style="text-align:center;margin-top:6px"><button class="btn btn-sm" style="font-size:11px" data-n="' + escHtml(d.name) + '" data-t="' + escHtml(d.team) + '" onclick="abrirMapaJugador(this.getAttribute(\'data-n\'),this.getAttribute(\'data-t\'))">Detalle y carga de tiros</button></div></div>').join('');
+  return '<div class="card" style="margin-bottom:14px"><div class="card-t">Mapa de tiro de cada jugador</div>'
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px">' + celdas + '</div></div>';
+}
+
+function cmpRenderVista() {
+  const el = document.getElementById('cmpVista'); if (!el) return;
+  const ds = cmpDatos();
+  const nota = document.getElementById('cmp-nota');
+  if (nota) nota.textContent = cmpModo === '36' ? 'Cada 36 min: las estadísticas de conteo (puntos, rebotes, asistencias…) se llevan a 36 minutos para comparar con justicia a jugadores con distinto tiempo de juego.' : '';
+  if (!ds.length) { el.innerHTML = '<div class="card" style="margin-bottom:14px;color:var(--text3);font-size:13px">Buscá jugadores arriba para compararlos. Con 2 ves un cara a cara y con 3 a 5 una tabla contra la liga.</div>'; return; }
+  let poolN = []; try { poolN = _poolPercentiles().map(cmpNorm); } catch (e) { poolN = []; }
+  let h = '';
+  if (ds.length === 1) h += '<div class="card" style="margin-bottom:14px;color:var(--text3);font-size:13px">Sumá otro jugador para ver el cara a cara. Mientras tanto, este es el perfil de <b style="color:var(--text)">' + escHtml(ds[0].nom) + '</b>.</div>';
+  else if (ds.length === 2) h += cmpHtmlDuelo(ds, poolN);
+  else h += cmpHtmlTabla(ds, poolN);
+  h += cmpHtmlPerfil(ds, poolN);
+  h += cmpHtmlMapas(ds);
+  el.innerHTML = h;
+}
+
 function rCmp() {
-  cmpRenderTarjetas();
-  cmpRenderTabla();
-  rCmpCharts();
+  cmpRenderVista();
   cmpRenderMapas();
 }
 
@@ -14601,7 +14916,7 @@ ${[{k:'F',l:'Fortalezas',ic:'💪',bg:'#f1f8e9',bd:'#c5e1a5',hc:'#558b2f'},
 </div></body></html>`;
 
   if (fmt === 'pdf') {
-    const blob = new Blob([html], {type:'text/html;charset=utf-8'});
+    const blob = new Blob([typeof bpFemHtml === 'function' ? bpFemHtml(html) : html], {type:'text/html;charset=utf-8'});
     const url = URL.createObjectURL(blob);
     document.getElementById('pdfFrame').srcdoc = html;
     document.getElementById('pdfPreviewModal').style.display = 'flex';
@@ -15038,7 +15353,7 @@ function printScouting() {
   }
   const w = window.open('', '_blank');
   if (!w) { alert('Permití las ventanas emergentes para generar el PDF.'); return; }
-  w.document.open(); w.document.write(html); w.document.close();
+  w.document.open(); w.document.write(typeof bpFemHtml === "function" ? bpFemHtml(html) : html); w.document.close();
 }
 
 
@@ -21331,7 +21646,7 @@ function _infImprimirInformeCompleto() {
   if (!html) return;
   const w = window.open('', '_blank');
   if (!w) { alert('Permití las ventanas emergentes para imprimir el informe.'); return; }
-  w.document.open(); w.document.write(html); w.document.close();
+  w.document.open(); w.document.write(typeof bpFemHtml === "function" ? bpFemHtml(html) : html); w.document.close();
   setTimeout(()=>{ try { w.focus(); w.print(); } catch(e){} }, 500);
 }
 
@@ -21431,7 +21746,7 @@ function _infImprimirComparativa() {
   if (!html) html = _infHtmlComparativa();
   const w = window.open('', '_blank');
   if (!w) { alert('Permití las ventanas emergentes para imprimir el informe.'); return; }
-  w.document.open(); w.document.write(html); w.document.close();
+  w.document.open(); w.document.write(typeof bpFemHtml === "function" ? bpFemHtml(html) : html); w.document.close();
   setTimeout(()=>{ try { w.focus(); w.print(); } catch(e){} }, 500);
 }
 
@@ -32373,7 +32688,7 @@ function _imprimirInformeCruces() {
   if (!html) return;
   const w = window.open('', '_blank');
   if (!w) { alert('Permití las ventanas emergentes para imprimir el informe.'); return; }
-  w.document.open(); w.document.write(html); w.document.close();
+  w.document.open(); w.document.write(typeof bpFemHtml === "function" ? bpFemHtml(html) : html); w.document.close();
   setTimeout(()=>{ try { w.focus(); w.print(); } catch(e){} }, 500);
 }
 
@@ -39713,6 +40028,7 @@ window.bpGuardia = function(){
       '#bp-fj .fj-pb{display:flex;height:14px;border-radius:7px;overflow:hidden;margin:6px 0}',
       '#bp-fj .fj-pt{cursor:pointer}',
       '#bp-fj .fj-pt:hover{stroke:var(--green);stroke-width:2}',
+      '#bp-fj .fj-pt:hover .fj-ring{stroke:var(--green);stroke-width:2.5}',
       '#fj-tip{position:fixed;z-index:9999;pointer-events:none;background:var(--bg2,#222);color:var(--text,#fff);border:1px solid var(--border2,#555);border-radius:8px;padding:6px 9px;font-size:11px;line-height:1.35;box-shadow:0 4px 14px rgba(0,0,0,.35);max-width:220px;display:none}',
       '#fj-tip b{font-size:12px}#fj-tip .t3{color:var(--text3,#999)}',
       '@media (max-width:860px){#bp-fj .fj-two,#bp-fj .fj-cols,#bp-fj .fj-cols2{grid-template-columns:1fr}#bp-fj .fj-kp{margin-left:0}}',
@@ -39750,6 +40066,33 @@ window.bpGuardia = function(){
       xl: 'MIN · minutos por partido →', yl: 'VAL · valoración →', q: ['Pieza clave', 'Rinde con pocos minutos', 'Juega mucho, produce poco', 'Rol menor'], fx: f1, fy: f1 }
   ];
 
+  // Foto del jugador como imagen liviana (blob) para no repetir el base64 en cada punto de cada gráfico.
+  var _fjBlob = {};
+  function fotoUrl(nombre) {
+    var d = null; try { d = (typeof playerPhotos !== 'undefined' && playerPhotos) ? playerPhotos[nombre] : null; } catch (e) {}
+    if (!d || typeof d !== 'string') return '';
+    var k = nombre + '|' + d.length;
+    if (_fjBlob[k] !== undefined) return _fjBlob[k];
+    var u = d;
+    try {
+      var m = /^data:([^;,]+);base64,(.*)$/.exec(d);
+      if (m && window.URL && URL.createObjectURL) {
+        var bin = atob(m[2]), a = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i);
+        u = URL.createObjectURL(new Blob([a], { type: m[1] }));
+      }
+    } catch (e) { u = d; }
+    _fjBlob[k] = u; return u;
+  }
+  var _fjHayFoto = false;
+  // Punto con la cara: círculo recortado con la foto y un aro. Si no hay foto, queda el punto gris de siempre.
+  function puntoFoto(ci, i, cx, cy, r, url, aro, grosor) {
+    var id = 'fjcp' + ci;
+    return '<g class="fj-pt" data-s="' + ci + '" data-i="' + i + '"><circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="var(--bg2)"/>'
+      + '<image href="' + url + '" x="' + (cx - r) + '" y="' + (cy - r) + '" width="' + (2 * r) + '" height="' + (2 * r) + '" preserveAspectRatio="xMidYMin slice" clip-path="url(#' + id + ')"/>'
+      + '<circle class="fj-ring" cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="' + aro + '" stroke-width="' + grosor + '"/></g>';
+  }
+
   var DAT = [];
   function scatter(c, set, me, ci) {
     var pts = set.map(function (p) { return { p: p, x: c.gx(p), y: c.gy(p) }; }).filter(function (q) { return q.x != null && q.y != null && isFinite(q.x) && isFinite(q.y); });
@@ -39770,8 +40113,16 @@ window.bpGuardia = function(){
     o += '<text x="' + (W - pR - 4) + '" y="' + top + '" font-size="10" font-weight="700" fill="var(--green)" text-anchor="end">' + c.q[0] + '</text><text x="' + (pL + 4) + '" y="' + top + '" font-size="9" fill="var(--text3)">' + c.q[1] + '</text><text x="' + (W - pR - 4) + '" y="' + bot + '" font-size="9" fill="var(--text3)" text-anchor="end">' + c.q[2] + '</text><text x="' + (pL + 4) + '" y="' + bot + '" font-size="9" fill="var(--text3)">' + c.q[3] + '</text>';
     o += '<text x="' + ((pL + W - pR) / 2) + '" y="' + (H - 5) + '" font-size="10" fill="var(--text2)" text-anchor="middle">' + c.xl + '</text><text x="11" y="' + ((pT + H - pB) / 2) + '" font-size="10" fill="var(--text2)" text-anchor="middle" transform="rotate(-90 11 ' + ((pT + H - pB) / 2) + ')">' + c.yl + '</text>';
     DAT[ci] = { c: c, pts: pts };
-    pts.forEach(function (q, i) { if (q !== yo) o += '<circle class="fj-pt" data-s="' + ci + '" data-i="' + i + '" cx="' + px(q.x) + '" cy="' + py(q.y) + '" r="5" fill="var(--border2)" stroke="var(--text3)" stroke-width=".8" opacity=".95"/>'; });
-    o += '<circle class="fj-pt" data-s="' + ci + '" data-i="' + pts.indexOf(yo) + '" cx="' + px(yo.x) + '" cy="' + py(yo.y) + '" r="8" fill="var(--green)" stroke="var(--text)" stroke-width="1.5"/>';
+    o = '<defs><clipPath id="fjcp' + ci + '" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath></defs>' + o;
+    pts.forEach(function (q, i) {
+      if (q === yo) return;
+      var url = fotoUrl(q.p.name);
+      if (url) { _fjHayFoto = true; o += puntoFoto(ci, i, px(q.x), py(q.y), 11, url, 'var(--text3)', 1); }
+      else o += '<circle class="fj-pt" data-s="' + ci + '" data-i="' + i + '" cx="' + px(q.x) + '" cy="' + py(q.y) + '" r="5" fill="var(--border2)" stroke="var(--text3)" stroke-width=".8" opacity=".95"/>';
+    });
+    var urlYo = fotoUrl(yo.p.name);
+    if (urlYo) o += puntoFoto(ci, pts.indexOf(yo), px(yo.x), py(yo.y), 15, urlYo, 'var(--green)', 3);
+    else o += '<circle class="fj-pt" data-s="' + ci + '" data-i="' + pts.indexOf(yo) + '" cx="' + px(yo.x) + '" cy="' + py(yo.y) + '" r="8" fill="var(--green)" stroke="var(--text)" stroke-width="1.5"/>';
     // Perfil según el cuadrante en el que cae
     var derecha = yo.x >= mx, arriba = c.inv ? yo.y <= my : yo.y >= my;
     var perfil = c.q[derecha ? (arriba ? 0 : 2) : (arriba ? 1 : 3)];
@@ -39896,7 +40247,7 @@ window.bpGuardia = function(){
     var rk = function (get, low) { return rankDe(pool, me, get, low); };
     var ord = function (r) { return r.pos + '.º de ' + r.de; };
     var rv = rk(function (q) { return q.prom.VAL; });
-    o.push('<b>' + esc(n) + '</b>' + (posTxt ? ' (' + esc(posTxt.toLowerCase()) + ')' : '') + ' juega ' + f1(pr.MIN || 0) + ' minutos por partido y promedia ' + f1(pr.PTS || 0) + ' puntos, ' + f1(pr.REB || 0) + ' rebotes y ' + f1(pr.AST || 0) + ' asistencias' + (rv ? '; su valoración de ' + f1(pr.VAL || 0) + ' lo ubica ' + ord(rv) + ' en la liga' : '') + '.');
+    o.push('<b>' + esc(n) + '</b>' + (posTxt ? ' (' + esc(posTxt.toLowerCase()) + ')' : '') + ' juega ' + f1(pr.MIN || 0) + ' minutos por partido y promedia ' + f1(pr.PTS || 0) + ' puntos, ' + f1(pr.REB || 0) + ' rebotes y ' + f1(pr.AST || 0) + ' asistencias' + (rv ? '; su valoración de ' + f1(pr.VAL || 0) + (bpEsFem() ? ' la ubica ' : ' lo ubica ') + ord(rv) + ' en la liga' : '') + '.');
     // lo mejor y lo que menos le sale, según el puesto en cada cuadro
     var T = [['puntos', function (q) { return q.prom.PTS; }, 0], ['rebotes', function (q) { return q.prom.REB; }, 0], ['asistencias', function (q) { return q.prom.AST; }, 0], ['recuperos', function (q) { return q.prom.REC; }, 0], ['tapones', function (q) { return q.prom.TAP; }, 0], ['eficiencia de tiro', function (q) { return q.prom.TS; }, 0], ['cuidado de la pelota', function (q) { return q.prom.PER; }, 1]]
       .map(function (t) { var r = rk(t[1], t[2]); return r ? { n: t[0], r: r, f: r.pos / r.de } : null; }).filter(Boolean);
@@ -40008,11 +40359,11 @@ window.bpGuardia = function(){
       if (S.comp === 'pos') { var a = pos1(me); return a && pos1(p) === a; }
       return true;
     });
-    DAT = [];
+    DAT = []; _fjHayFoto = false;
     var sc = CFG.map(function (c, ci) { var r = scatter(c, comp, me, ci); return '<div class="fj-sc"><h4>' + c.t + '</h4><div class="d">' + c.d + '</div>' + r.svg + (r.txt ? '<div class="rd">' + r.txt + '</div>' : '') + '</div>'; }).join('');
     var chip = function (k, t) { return '<button class="fj-chip' + (S.comp === k ? ' on' : '') + '" data-c="' + k + '">' + t + '</button>'; };
     var ident = '<div class="card"><div class="card-t">Identidad de juego</div><div class="fj-ctl"><span>Comparar con:</span>' + chip('liga', 'Toda la liga') + chip('club', 'Su equipo') + chip('pos', 'Mismo puesto') + '<span style="margin-left:auto">Mínimo ' + MIN_TOT + ' minutos jugados · pasá el mouse por un punto para ver quién es</span></div>'
-      + '<div class="fj-scs">' + sc + '</div>' + (S.comp === 'pos' && !posTxt ? '<div class="fj-note">Este jugador no tiene posición cargada: se compara con toda la liga.</div>' : '') + '</div>';
+      + '<div class="fj-scs">' + sc + '</div>' + (_fjHayFoto ? '<div class="fj-note">Cada punto es un jugador con su foto. Los puntos grises son jugadores sin foto cargada.</div>' : '') + (S.comp === 'pos' && !posTxt ? '<div class="fj-note">Este jugador no tiene posición cargada: se compara con toda la liga.</div>' : '') + '</div>';
 
     // 6) Evolución
     var evo = '<div class="card"><div class="fj-head" style="margin-bottom:6px"><div class="card-t" style="margin:0">Evolución partido a partido</div><select id="fj-evo-s" aria-label="Estadística">' + EVO.map(function (e) { return '<option value="' + e[0] + '"' + (S.evo === e[0] ? ' selected' : '') + '>' + e[1] + '</option>'; }).join('') + '</select></div><div id="fj-evo">' + evoSvg(ser, S.evo) + '</div></div>';
@@ -40192,6 +40543,128 @@ window.bpGuardia = function(){
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
   var t = null;
   new MutationObserver(function(){ clearTimeout(t); t = setTimeout(fijar, 250); }).observe(document.body || document.documentElement, {childList:true, subtree:true});
+})();
+</script>
+<script id="bp-genero">
+/* v96 · Redacción en femenino cuando la liga es femenina (Liga Femenina, etc.).
+   Cambia solo el texto que se ve (no los datos): jugador→jugadora, el→la, anotador→anotadora, etc. */
+(function(){
+  var U = 'iu';
+  function esFem(){
+    try {
+      var t = ((typeof cfgData !== 'undefined' && cfgData) ? ((cfgData.torneo || '') + ' ' + (cfgData.division || '')) : '') + ' ' + (typeof currentLeagueName === 'function' ? (currentLeagueName() || '') : '');
+      return /femenin/i.test(t);
+    } catch (e) { return false; }
+  }
+  window.bpEsFem = esFem;
+
+  var NOUN = '(?:jugador(?:es)?|anotador(?:es)?|tirador(?:es)?|goleador(?:es)?|reboteador(?:es)?|distribuidor(?:es)?|creador(?:es)?|armador(?:es)?|defensor(?:es)?|pasador(?:es)?|compañeros?|aleros?|dueños?|capit[aá]n(?:es)?)';
+  var INV  = '(?:bases?|escoltas?|p[ií]vots?|pivots?|l[ií]deres?|referentes?|titulares?|suplentes?|protagonistas?|especialistas?|inicialistas?)';
+  var DET = {
+    el:'la', los:'las', un:'una', unos:'unas', del:'de la', al:'a la',
+    este:'esta', estos:'estas', ese:'esa', esos:'esas', aquel:'aquella', aquellos:'aquellas',
+    otro:'otra', otros:'otras', mismo:'misma', mismos:'mismas',
+    'único':'única', 'únicos':'únicas', primer:'primera', segundo:'segunda', tercer:'tercera', cuarto:'cuarta', quinto:'quinta',
+    'máximo':'máxima', 'máximos':'máximas', 'ningún':'ninguna', 'algún':'alguna',
+    todos:'todas', ambos:'ambas', varios:'varias', muchos:'muchas', pocos:'pocas', algunos:'algunas',
+    buen:'buena', buenos:'buenas', mal:'mala', malos:'malas', nuestro:'nuestra', nuestros:'nuestras', vuestro:'vuestra', vuestros:'vuestras', verdadero:'verdadera', verdaderos:'verdaderas'
+  };
+  var PASA = ['mejor','mejores','peor','peores','mayor','mayores','menor','menores','cada'];
+  var DETRE = '(?:' + Object.keys(DET).concat(PASA).join('|') + '|\\d+)';
+  var reN = new RegExp('(^|[^\\p{L}])((?:' + DETRE + '\\s+)*)(' + NOUN + ')(?![\\p{L}])', U + 'g');
+  var reI = new RegExp('(^|[^\\p{L}])((?:' + DETRE + '\\s+)+)(' + INV + ')(?![\\p{L}])', U + 'g');
+  var reA = new RegExp('(jugador|anotador|tirador|goleador|reboteador|distribuidor|creador|armador|defensor|pasador|capitán|compañer|aler|dueñ)(a|as)((?:\\s+(?:más|muy))?\\s+)(destacad|efectiv|valios|peligros|precis|consolidad|experimentad|productiv|complet)(o|os)(?![\\p{L}])', U + 'g');
+
+  var rePh = new RegExp('(^|[^\\p{L}])(los)(\\s+más\\s+)(influyentes|productivos|destacados|valiosos|completos|determinantes|regulares|eficientes)(?![\\p{L}])', U);
+  function caso(orig, nuevo) {
+    if (orig.length > 1 && orig === orig.toUpperCase() && orig !== orig.toLowerCase()) return nuevo.toUpperCase();
+    if (orig.charAt(0) !== orig.charAt(0).toLowerCase()) return nuevo.charAt(0).toUpperCase() + nuevo.slice(1);
+    return nuevo;
+  }
+  function sust(w) {
+    var l = w.toLowerCase(), m;
+    if ((m = /^(jugador|anotador|tirador|goleador|reboteador|distribuidor|creador|armador|defensor|pasador)(es)?$/.exec(l))) return caso(w, m[1] + 'a' + (m[2] ? 's' : ''));
+    if ((m = /^(compañer|aler|dueñ)o(s)?$/.exec(l))) return caso(w, m[1] + 'a' + (m[2] || ''));
+    if ((m = /^capit[aá]n(es)?$/.exec(l))) return caso(w, 'capitana' + (m[1] ? 's' : ''));
+    return w;
+  }
+  function cadena(c) {
+    return c.replace(/(\S+)(\s+)/g, function (_, t, sp) {
+      var f = DET[t.toLowerCase()];
+      return (f ? caso(t, f) : t) + sp;
+    });
+  }
+  function fem(s) {
+    if (!s || typeof s !== 'string') return s;
+    var r = s;
+    r = r.replace(reN, function (_, pre, ch, n) { return pre + cadena(ch) + sust(n); });
+    r = r.replace(reI, function (_, pre, ch, n) { return pre + cadena(ch) + n; });
+    r = r.replace(rePh, function (_, pre, l, mid, adj) { return pre + caso(l, 'las') + mid + adj.replace(/os$/, 'as'); });
+    r = r.replace(new RegExp('(^|[^\\p{L}])(por)(\\s+)(él)(?![\\p{L}])', U + 'g'), function (_, pre, p, sp) { return pre + p + sp + 'ella'; });
+    r = r.replace(/arma para otros(?![A-Za-zÁÉÍÓÚáéíóúñÑ])/g, 'arma para otras');
+    r = r.replace(reA, function (_, st, a, mid, adj, o, os) { return st + a + mid + adj + (o === 'os' ? 'as' : 'a'); });
+    return r;
+  }
+  window.bpFem = fem;
+
+  // HTML completo (informes que se abren en otra ventana): se transforma solo el texto, no las etiquetas ni scripts.
+  window.bpFemHtml = function (html) {
+    if (!esFem() || typeof html !== 'string') return html;
+    return html.split(/(<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>|<[^>]+>)/i).map(function (p, i) { return i % 2 ? p : fem(p); }).join('');
+  };
+
+  var TEST = /por él|para otros|jugador|anotador|tirador|goleador|reboteador|distribuidor|creador|armador|defensor|compañero|alero|dueño|capit[aá]n|base|escolta|p[ií]vot|pivot|l[ií]der|referente|titular|suplente|protagonista|especialista|inicialista/i;
+  var cambios = new Map();       // nodo -> {o: texto original, f: texto femenino}
+  var estado = null;
+
+  function procesarNodo(n) {
+    var v = n.nodeValue;
+    if (!v || !TEST.test(v)) return;
+    var f = fem(v);
+    if (f !== v) { if (!cambios.has(n)) cambios.set(n, { o: v, f: f }); else cambios.get(n).f = f; n.nodeValue = f; }
+  }
+  function procesar(raiz) {
+    if (!raiz) return;
+    if (raiz.nodeType === 3) { procesarNodo(raiz); return; }
+    if (raiz.nodeType !== 1) return;
+    var w = document.createTreeWalker(raiz, NodeFilter.SHOW_TEXT, null), n, arr = [];
+    while ((n = w.nextNode())) {
+      var t = n.parentNode && n.parentNode.nodeName;
+      if (t === 'SCRIPT' || t === 'STYLE' || t === 'TEXTAREA' || t === 'NOSCRIPT') continue;
+      arr.push(n);
+    }
+    arr.forEach(procesarNodo);
+  }
+  function restaurar() {
+    cambios.forEach(function (c, n) { if (n.isConnected && n.nodeValue === c.f) n.nodeValue = c.o; });
+    cambios.clear();
+  }
+  var pend = new Set(), prog = false;
+  function chequear() {
+    var e = esFem();
+    if (e !== estado) { estado = e; if (e) procesar(document.body); else restaurar(); }
+    return e;
+  }
+  function iniciar() {
+    chequear();
+    new MutationObserver(function (muts) {
+      var e = chequear();
+      if (!e) return;
+      muts.forEach(function (m) {
+        if (m.type === 'childList') m.addedNodes.forEach(function (a) { pend.add(a); });
+        else if (m.type === 'characterData') pend.add(m.target);
+      });
+      if (!prog && pend.size) {
+        prog = true;
+        requestAnimationFrame(function () {
+          prog = false;
+          var lista = Array.from(pend); pend.clear();
+          lista.forEach(function (a) { if (a.isConnected !== false) procesar(a); });
+        });
+      }
+    }).observe(document.body, { childList: true, subtree: true, characterData: true });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar); else iniciar();
 })();
 </script>
 </body>
