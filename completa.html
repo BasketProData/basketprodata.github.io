@@ -38305,7 +38305,8 @@ window.bpGuardia = function(){
 
   function armar() {
     var v = $('v-home'), ref = $('home-kpis'); if (!v || !ref) return;
-    var games = sortedGames(), n = games.length; if (!n) return;
+    var _gAll = sortedGames(), games = (typeof juegosParaStats === 'function') ? juegosParaStats() : _gAll; if (!games.length) games = _gAll; var n = games.length; if (!n) return;
+    var _nPO = _gAll.length - games.length;
     var name = activeTeamName();
     var rows = []; try { rows = getTorneoTeams() || []; } catch (e) {}
     var idx = rows.findIndex(function (t) { try { return teamNameMatch(t.name, name); } catch (e) { return false; } });
@@ -38335,7 +38336,7 @@ window.bpGuardia = function(){
       return '<div class="bi-chip ' + g.result + '" title="' + esc((g.location === 'L' ? 'Local' : 'Visita') + ' vs ' + g.rival + ' ' + g.vmScore + '-' + g.rvScore) + '">' + g.result + '</div>';
     }).join('');
     var head = '<div class="bi-head"><div class="bi-logo">' + (logo ? '<img alt="" src="' + esc(logo) + '">' : '🏀') + '</div>' +
-      '<div class="bi-id"><h2>' + esc(name) + '</h2><p>' + esc([cfgT, cfgD].filter(Boolean).join(' · ')) + ' · ' + n + ' partido' + (n !== 1 ? 's' : '') + '</p></div>' +
+      '<div class="bi-id"><h2>' + esc(name) + '</h2><p>' + esc([cfgT, cfgD].filter(Boolean).join(' · ')) + ' · fase regular · ' + n + ' partido' + (n !== 1 ? 's' : '') + (_nPO > 0 ? ' · ' + _nPO + ' de playoffs no incluido' + (_nPO !== 1 ? 's' : '') : '') + '</p></div>' +
       '<div class="bi-hs">' +
       '<div><small>Récord</small><b style="color:' + (wins / n >= .5 ? G : R) + '">' + wins + '-' + (n - wins) + ' <span>' + Math.round(wins / n * 100) + '%</span></b></div>' +
       (idx >= 0 ? '<div><small>Posición</small><b>#' + (idx + 1) + ' <span>de ' + rows.length + '</span></b></div>' : '') +
@@ -38356,7 +38357,7 @@ window.bpGuardia = function(){
       var L = rows.length ? liga(rows, k.f, k.alto, name) : null;
       var lc = L ? pcol(L.pct) : 'var(--text3)';
       return '<div class="bi-k"><small>' + k.l + '</small><div class="v" style="color:' + k.c + '">' + k.v + '</div>' +
-        '<div class="r">' + (L ? pill(L) + '<span>· liga ' + L.media + '</span>' : '') + '</div>' + spark(k.s, lc) + '</div>';
+        '<div class="r">' + (L ? pill(L) + '<span>· ' + (k.f === 'diff' ? 'líder ' + sg_(Math.max.apply(0, rows.map(function (t) { return +t.diff || 0; }))) : 'liga ' + L.media) + '</span>' : '') + '</div>' + spark(k.s, lc) + '</div>';
     }).join('') + '</div>';
 
     // ── contenedor ──
@@ -40665,6 +40666,260 @@ window.bpGuardia = function(){
     }).observe(document.body, { childList: true, subtree: true, characterData: true });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar); else iniciar();
+})();
+</script>
+<script id="bp-v97">
+(function(){
+'use strict';
+if(window.__bp97)return;window.__bp97=1;
+var G='var(--green)',R='var(--red)',AM='#c8860a';
+function esc(s){return typeof escHtml==='function'?escHtml(s):String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function r1(v){return Math.round(v*10)/10}
+function sg(v){return(v>0?'+':'')+r1(v)}
+
+/* ───────── Diccionario: una sola fuente para los "?" y la Guía ───────── */
+var DEF=[
+{g:'Resultado',re:/^(puntos a favor|conv\.?|puntos convertidos)$/i,t:'Puntos a favor',d:'Promedio de puntos que anota el equipo por partido.'},
+{g:'Resultado',re:/^(puntos en contra|rec\.?|puntos recibidos)$/i,t:'Puntos en contra',d:'Promedio de puntos que recibe por partido. <b>Menos es mejor.</b>'},
+{g:'Resultado',re:/^(diferencia|dif\.?|dif)$/i,t:'Diferencia',d:'Puntos a favor menos puntos en contra, por partido. Es el mejor resumen simple de qué tan bien juega un equipo: suele predecir mejor el futuro que el récord. La media de la liga siempre es 0.'},
+{g:'Resultado',re:/^récord$/i,t:'Récord',d:'Victorias y derrotas de la fase regular. Los playoffs no se cuentan acá (están en Torneo).'},
+{g:'Resultado',re:/^(racha)$/i,t:'Racha',d:'Cuántos partidos seguidos lleva ganando (V) o perdiendo (D).'},
+{g:'Eficiencia',re:/^(ataque( \(ortg\))?|ortg|oer)$/i,t:'Ataque · ORtg',d:'Puntos que anota cada 100 posesiones. Compara ataques de equipos que juegan a distinto ritmo. Más es mejor; alrededor de 105 es muy bueno en esta liga.'},
+{g:'Eficiencia',re:/^(defensa( \(drtg\))?|drtg|der)$/i,t:'Defensa · DRtg',d:'Puntos que recibe cada 100 posesiones del rival. <b>Menos es mejor</b>; por debajo de 100 es excelente.'},
+{g:'Eficiencia',re:/^(ritmo( \(pos\/40′?\))?|pace)$/i,t:'Ritmo',d:'Posesiones por cada 40 minutos. Alto = juego rápido, muchas posesiones. No es bueno ni malo: define el estilo.'},
+{g:'Eficiencia',re:/^net( rating)?\b/i,t:'Net Rating',d:'ORtg menos DRtg: cuánto gana el equipo por cada 100 posesiones. Más de +5 es muy bueno.'},
+{g:'Four Factors',re:/^(tiro \(efg%?\)|efg%?)$/i,t:'eFG% · efectividad de tiro',d:'Porcentaje de campo que cuenta el triple como 1,5 tiros (vale más). Mide qué tan bien tira. Arriba de 52% es muy bueno.'},
+{g:'Four Factors',re:/^(pérdidas \(tov%?\)|tov%?)$/i,t:'TOV% · pérdidas',d:'De cada 100 ataques, cuántos terminan en pérdida. <b>Menos es mejor.</b>'},
+{g:'Four Factors',re:/^(reb\. ofensivo|orb%?|oreb%?)$/i,t:'ORB% · rebote ofensivo',d:'Porcentaje de los rebotes ofensivos disponibles que captura el equipo. Cada uno es una segunda chance. Arriba de 28% es bueno.'},
+{g:'Four Factors',re:/^(tiros libres \(ftr\)|ftr)$/i,t:'FTr · tiros libres por tiro',d:'Cuántos libres lanza por cada tiro de campo. Mide cuánto va a la línea (y cuánto saca faltas).'},
+{g:'Jugadores',re:/^ts%?$/i,t:'TS% · efectividad real',d:'Como eFG% pero también cuenta los tiros libres. Es la mejor medida de eficiencia individual al tirar.'},
+{g:'Jugadores',re:/^usg%?$/i,t:'USG% · uso',d:'Porcentaje de las jugadas del equipo que termina el jugador (tiro, libres o pérdida) mientras está en cancha. Alto = el ataque pasa por él.'},
+{g:'Jugadores',re:/^val$/i,t:'VAL · valoración',d:'Suma lo positivo (puntos, rebotes, asistencias, robos, tapas) y resta lo negativo (tiros errados, pérdidas, faltas). Resumen rápido del aporte.'},
+{g:'Jugadores',re:/^(pie|net)$/i,t:'PIE / aporte',d:'Porcentaje del total de aportes del partido que hizo el jugador. Sobre 10% es mejor que el promedio.'},
+{g:'Jugadores',re:/^ppp$/i,t:'PPP · puntos por posesión',d:'Puntos que genera cada vez que termina una jugada.'},
+{g:'Mapas y gráficos',re:/desde d[oó]nde tira|mapa de tiro|mapa por zonas/i,t:'Mapa de tiro por zonas',d:'Cada zona muestra el % de acierto y cuántos tiros se tomaron. <b>Verde</b> = rinde por encima de la media de la liga en esa zona; <b>naranja</b> = por debajo. Las zonas con pocos intentos se ven más tenues: con menos de 10 tiros no saques conclusiones.'},
+{g:'Mapas y gráficos',re:/qui[eé]n domina cada zona/i,t:'Quién domina cada zona',d:'Ranking de puntos por tiro desde cada zona (con un mínimo de intentos para que no cuente un 1 de 1). En "Defensa" mide cuánto permite: menos es mejor.'},
+{g:'Mapas y gráficos',re:/^contra la liga$/i,t:'Contra la liga',d:'El punto marca dónde está el equipo respecto del resto: izquierda = peor, derecha = mejor, línea del medio = media de la liga. En pérdidas y defensa, menos es mejor, ya está invertido.'},
+{g:'Mapas y gráficos',re:/^distribuci[oó]n$/i,t:'Distribución de tiros',d:'De qué zonas sale el volumen de tiros del equipo: mucho aro y triple suele ser más eficiente que mucho tiro de media distancia.'},
+{g:'Mapas y gráficos',re:/identidad de juego/i,t:'Identidad de juego',d:'Cómo juega el jugador comparado con toda la liga (percentiles). Un 80 significa que supera al 80% de los jugadores con partidos suficientes.'},
+{g:'Mapas y gráficos',re:/^gr[aá]ficos$|dispersi[oó]n/i,t:'Gráficos de dispersión',d:'Cada punto es un jugador. Ubicá al jugador elegido (resaltado) respecto del resto: arriba/derecha es mejor en los dos ejes, salvo que el eje diga "menos es mejor".'},
+{g:'Mapas y gráficos',re:/^l[ií]deres del equipo$/i,t:'Líderes del equipo',d:'Promedio por partido. La flecha ▲▼ compara los últimos 4 partidos con el promedio de toda la temporada.'},
+{g:'Mapas y gráficos',re:/^rotaci[oó]n/i,t:'Rotación',d:'Minutos y puntos de cada jugador en los últimos 4 partidos: te muestra quién juega más hoy.'},
+{g:'Mapas y gráficos',re:/quintetos acumulados/i,t:'Quintetos',d:'Rendimiento de cada formación de cinco jugadores que compartió cancha. NET = diferencia de puntos mientras estuvieron juntos (con pocos minutos es poco confiable).'},
+{g:'Mapas y gráficos',re:/on ?\/ ?off/i,t:'On / Off',d:'Cómo le va al equipo con el jugador en cancha contra cuando está en el banco. Positivo = el equipo mejora con él.'},
+{g:'Acciones',re:/estad[ií]sticas por acciones/i,t:'Estadísticas por acciones',d:'Resultado de cada tipo de jugada (1x1, pick and roll, contraataque, etc.): cuántas veces se hizo, cuántos puntos dio y con qué efectividad.'},
+{g:'Acciones',re:/^lectura del per[ií]odo$/i,t:'Lectura del período',d:'Resumen de un tramo del partido elegido (por ejemplo un cuarto): quién anotó, qué pasó con pérdidas y rebotes.'},
+{g:'Resultado',re:/^(local|visitante)$/i,t:'Local / Visitante',d:'Récord del equipo jugando en casa y de visitante. Una gran diferencia entre los dos suele marcar un equipo que depende de su cancha.'},
+{g:'Resultado',re:/^pts?\.? (prom\.?|total)$|^pts$/i,t:'Puntos (PTS)',d:'Puntos anotados: promedio por partido o total acumulado. En las tablas de posiciones, PTS son los puntos de tabla (victoria 2, derrota 1).'},
+{g:'Jugadores',re:/^(reb|ast)\.? prom\.?$/i,t:'REB / AST promedio',d:'Rebotes o asistencias por partido del equipo.'},
+{g:'Jugadores',re:/^%tl$|^% ?tl$/i,t:'%TL · tiros libres',d:'Porcentaje de acierto en tiros libres.'},
+{g:'Resultado',re:/^% acierto$|^% rivales$/i,t:'% de acierto',d:'Tiros convertidos sobre tiros intentados. Compará siempre el equipo con sus rivales: la diferencia dice más que el número solo.'},
+{g:'Resultado',re:/^dif\.? por ?partido$/i,t:'Diferencia por partido',d:'Cuánto mejor (o peor) que sus rivales rinde el equipo en esa estadística, por partido.'},
+{g:'Resultado',re:/^(posiciones|tabla de posiciones)\b/i,t:'Tabla de posiciones',d:'Orden por puntos de tabla (victoria 2, derrota 1); a igualdad se aplican los criterios de desempate del torneo.'},
+{g:'Mapas y gráficos',re:/^mapa de tiro( de cada jugador)?$|de d[oó]nde anota/i,t:'Mapa de tiro',d:'Dónde tira y con qué efectividad. <b>Verde</b> = por encima de la media de la liga en esa zona; <b>naranja</b> = por debajo. Las zonas con pocos tiros se ven tenues: no son confiables.'},
+{g:'Mapas y gráficos',re:/^mapa de calor/i,t:'Mapa de calor',d:'Tabla de colores: cuanto más intenso el color, mayor la valoración (VAL) del jugador en ese partido. Sirve para ver quién rinde de forma pareja y quién es irregular.'},
+{g:'Mapas y gráficos',re:/^(radar|perfil ofensivo)/i,t:'Radar',d:'Cada vértice es una estadística; cuanto más lejos del centro, mejor. La forma muestra el estilo: un radar parejo = equilibrado, uno con picos = especialista.'},
+{g:'Mapas y gráficos',re:/^scatter/i,t:'Gráfico de dispersión (scatter)',d:'Cada punto es un jugador y su posición combina dos estadísticas. Arriba a la derecha = mejor en las dos. Los puntos aislados son jugadores atípicos.'},
+{g:'Mapas y gráficos',re:/^four factors/i,t:'Four Factors',d:'Los cuatro factores que más explican ganar: <b>tiro (eFG%)</b>, <b>pérdidas (TOV%)</b>, <b>rebote ofensivo (ORB%)</b> y <b>tiros libres (FTr)</b>. Se ven para el equipo y para lo que permite al rival.'},
+{g:'Mapas y gráficos',re:/^eficiencia de tiro$/i,t:'Eficiencia de tiro',d:'Compara el acierto en dobles, triples y libres del equipo y de sus rivales, y los resume en eFG% y TS%.'},
+{g:'Mapas y gráficos',re:/perfil y origen de los puntos/i,t:'Perfil y origen de los puntos',d:'De dónde sale el puntaje del jugador: dobles, triples y libres, y en qué zonas del campo tira.'},
+{g:'Mapas y gráficos',re:/^puntos por (cuarto|fecha|partido)|^puntos a favor \/ en contra|oer \/ der por fecha|net rating por fecha|^evoluci[oó]n|^progresi[oó]n|posici[oó]n en la tabla/i,t:'Gráficos de evolución',d:'Muestran cómo cambió el rendimiento partido a partido. Mirá la tendencia (si sube o baja), no un solo punto: un partido aislado puede ser ruido.'},
+{g:'Jugadores',re:/^(top jugadores|jugadores destacados)/i,t:'Top / destacados',d:'Ranking de jugadores según la estadística indicada (VAL, minutos, etc.) con los partidos disputados.'},
+{g:'Jugadores',re:/^c[oó]mo tira$/i,t:'Cómo tira',d:'Resumen del tiro del jugador: efectividad por tipo de tiro y qué tan eficiente es comparado con la liga.'},
+{g:'Jugadores',re:/^lectura del jugador$/i,t:'Lectura del jugador',d:'Texto automático que interpreta las estadísticas del jugador y lo compara con la liga y con su equipo.'},
+{g:'Jugadores',re:/^foda del jugador$/i,t:'FODA del jugador',d:'Fortalezas, oportunidades, debilidades y amenazas sacadas de sus números, comparados con la liga.'},
+{g:'Jugadores',re:/^(minutos y valoraci[oó]n|minutaje)/i,t:'Minutos y valoración',d:'Cuántos minutos juega cada uno y cuánto rinde (VAL) en ese tiempo. Un jugador con muchos minutos y baja VAL es una señal de alerta.'},
+{g:'Jugadores',re:/^partido a partido$/i,t:'Partido a partido',d:'Los números del jugador en cada partido, para ver regularidad y tendencia.'},
+{g:'Resultado',re:/^(equipos del torneo|la liga de un vistazo|identidad de la liga)/i,t:'La liga de un vistazo',d:'Cómo se comparan todos los equipos de la liga en las métricas avanzadas. Sirve para ubicar a cualquier equipo respecto del resto.'},
+{g:'Jugadores',re:/^ficha del jugador$/i,t:'Ficha del jugador',d:'Todo lo del jugador en un solo lugar: lectura automática, mapa de tiro, comparación con la liga y partido a partido. Elegí al jugador en el desplegable.'},
+{g:'Jugadores',re:/^todas las estad[ií]sticas$/i,t:'Todas las estadísticas',d:'Tabla completa del jugador (promedios y acumulados) con tiros, rebotes, asistencias, pérdidas, faltas y las métricas avanzadas (TS%, USG%, VAL).'},
+{g:'Acciones',re:/play-by-play/i,t:'Play-by-Play (PBP)',d:'Registro jugada por jugada del partido. De acá salen los quintetos, el On/Off, los mapas de tiro y el detalle por cuarto.'},
+{g:'Resultado',re:/^lectura r[aá]pida$/i,t:'Lectura rápida',d:'Resumen escrito que interpreta los números del equipo comparándolos con el resto de la liga. Se genera solo con los partidos de fase regular.'}
+];
+function buscarDef(txt){
+  var s=String(txt||'').replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF▲▼↑↓]/gu,'').replace(/\s+/g,' ').trim();
+  if(!s||s.length>60)return null;
+  for(var i=0;i<DEF.length;i++)if(DEF[i].re.test(s))return DEF[i];
+  return null;
+}
+
+/* ───────── Popover "¿Qué significa?" ───────── */
+var css=document.createElement('style');css.id='bp-v97-css';
+css.textContent=[
+'.bp-q{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;margin-left:5px;border-radius:50%;border:1px solid var(--text3);color:var(--text2);font:700 10px/1 system-ui;background:none;cursor:pointer;padding:0;vertical-align:middle;flex:0 0 auto;opacity:.75}',
+'.bp-q:hover,.bp-q.on{background:#ff9f43;color:#000;border-color:#ff9f43;opacity:1}',
+'#bp-pop{position:fixed;z-index:99998;max-width:340px;width:calc(100vw - 24px);background:var(--bg2,#171d25);color:var(--text,#e8edf3);border:1px solid var(--border2,#33404f);border-left:3px solid #ff9f43;border-radius:10px;padding:11px 13px;font-size:12.5px;line-height:1.5;box-shadow:0 10px 30px rgba(0,0,0,.45);display:none}',
+'#bp-pop b.t{display:block;font-size:13px;margin-bottom:3px}#bp-pop a{display:inline-block;margin-top:7px;color:var(--green);cursor:pointer;font-size:11.5px;font-weight:700}',
+'#bp-guia-btn{position:fixed;left:12px;bottom:34px;z-index:9990;padding:7px 11px;border-radius:99px;border:1px solid var(--border2,#33404f);background:var(--bg2,#171d25);color:var(--text2);font:600 12px system-ui;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.35)}',
+'#bp-guia{position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.6);display:none;align-items:flex-start;justify-content:center;padding:4vh 12px;overflow:auto}',
+'#bp-guia .gbox{background:var(--bg2,#171d25);border:1px solid var(--border2,#33404f);border-radius:14px;max-width:760px;width:100%;padding:16px 18px;color:var(--text)}',
+'#bp-guia h3{margin:0;font-size:16px}#bp-guia input{width:100%;margin:10px 0;padding:8px 10px;border-radius:8px;border:1px solid var(--border2,#33404f);background:var(--bg,#0f1318);color:var(--text);font-size:13px}',
+'#bp-guia .gg{font-size:10px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;color:var(--text3);margin:14px 0 6px}',
+'#bp-guia .gi{padding:8px 10px;border:1px solid var(--border,#26303c);border-radius:8px;margin-bottom:6px;font-size:12.5px;color:var(--text2);line-height:1.5}#bp-guia .gi b{color:var(--text);display:block}',
+'#bp-guia .gx{float:right;cursor:pointer;font-size:20px;line-height:1;color:var(--text3);background:none;border:0}',
+'.bp-narr p{margin:0 0 9px}.bp-narr p:last-of-type{margin-bottom:0}',
+'.bp-narr .tg{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.bp-narr .tg span{font-size:11px;padding:3px 9px;border-radius:99px;border:1px solid var(--border2,#33404f);color:var(--text2)}',
+'.bp-narr .tg .ok{border-color:#1d6b3d;background:rgba(0,200,83,.1)}.bp-narr .tg .no{border-color:#7a2b2b;background:rgba(255,68,68,.1)}',
+'@media print{#bp-guia-btn,.bp-q,#bp-pop{display:none!important}}'
+].join('\n');
+document.head.appendChild(css);
+
+var pop=document.createElement('div');pop.id='bp-pop';document.body.appendChild(pop);
+var popBtn=null;
+function cerrarPop(){pop.style.display='none';if(popBtn)popBtn.classList.remove('on');popBtn=null}
+function abrirPop(btn,d){
+  if(popBtn===btn){cerrarPop();return}
+  cerrarPop();popBtn=btn;btn.classList.add('on');
+  var h='<b class="t">'+d.t+'</b>'+d.d+'<br><a onclick="BP97.guia(\''+d.t.replace(/'/g,"\\'")+'\')">📚 Ver la guía completa</a>';
+  pop.innerHTML=(typeof bpFemHtml==='function'?bpFemHtml(h):h);pop.style.display='block';
+  var r=btn.getBoundingClientRect(),w=pop.offsetWidth,hh=pop.offsetHeight;
+  var x=Math.max(12,Math.min(innerWidth-w-12,r.left-8)),y=r.bottom+8;
+  if(y+hh>innerHeight-8)y=Math.max(8,r.top-hh-8);
+  pop.style.left=x+'px';pop.style.top=y+'px';
+}
+document.addEventListener('click',function(e){
+  var q=e.target.closest&&e.target.closest('.bp-q');
+  if(q){e.stopPropagation();e.preventDefault();var i=+q.getAttribute('data-i');abrirPop(q,DEF[i]);return}
+  if(pop.style.display==='block'&&!e.target.closest('#bp-pop'))cerrarPop();
+},true);
+window.addEventListener('scroll',cerrarPop,true);
+
+/* ───────── Guía completa ───────── */
+var guia=document.createElement('div');guia.id='bp-guia';
+guia.innerHTML='<div class="gbox"><button class="gx" onclick="BP97.cerrarGuia()">×</button><h3>📚 Guía de métricas y gráficos</h3><input id="bp-guia-q" placeholder="Buscar: eFG, ritmo, mapa, USG…" oninput="BP97.filtrar(this.value)"><div id="bp-guia-l"></div></div>';
+document.body.appendChild(guia);
+guia.addEventListener('click',function(e){if(e.target===guia)cerrarGuia()});
+function pintarGuia(q,foco){
+  q=(q||'').toLowerCase();var g='',h='';
+  DEF.forEach(function(d){
+    var plano=(d.t+' '+d.d).replace(/<[^>]+>/g,'').toLowerCase();
+    if(q&&plano.indexOf(q)<0)return;
+    if(d.g!==g){g=d.g;h+='<div class="gg">'+g+'</div>'}
+    h+='<div class="gi"'+(foco&&foco===d.t?' style="border-color:#ff9f43"':'')+' data-t="'+esc(d.t)+'"><b>'+d.t+'</b>'+d.d+'</div>';
+  });
+  var el=document.getElementById('bp-guia-l');el.innerHTML=(typeof bpFemHtml==='function'?bpFemHtml(h):h)||'<div class="gi">Sin resultados.</div>';
+  if(foco){var f=el.querySelector('[data-t="'+foco.replace(/"/g,'\\"')+'"]');if(f)f.scrollIntoView({block:'center'})}
+}
+var btn=document.createElement('button');btn.id='bp-guia-btn';btn.textContent='📚 Guía';btn.title='Qué significa cada dato, mapa y gráfico';btn.onclick=function(){abrirGuia()};document.body.appendChild(btn);
+function abrirGuia(foco){cerrarPop();document.getElementById('bp-guia-q').value='';pintarGuia('',foco);guia.style.display='flex'}
+function cerrarGuia(){guia.style.display='none'}
+window.BP97={guia:abrirGuia,cerrarGuia:cerrarGuia,filtrar:function(v){pintarGuia(v)}};
+
+/* ───────── Inyección automática de "?" ───────── */
+var SEL='.kpi-l,.card-t,.bi-k small,.bi-t>span:first-child,.sec-title,.bi-liga>span:first-child,.bd-t>span:first-child,#v-av th,#v-torneo th,#v-eq th,#v-home th,.cmpx-h,.cmpx-t,#v-pbp [style*="font-weight:700"],#v-pbp h2,#v-jug h2,#v-jug h3';
+var enProceso=false;
+function decorar(){
+  if(enProceso)return;enProceso=true;
+  try{
+    document.querySelectorAll(SEL).forEach(function(el){
+      if(el.getAttribute('data-q'))return;
+      if(el.offsetParent===null)return;
+      var tx='';for(var n=el.firstChild;n;n=n.nextSibling){if(n.nodeType===3)tx+=n.nodeValue;else if(n.nodeType===1&&!n.classList.contains('bp-q')&&n.children.length===0)tx+=n.textContent}
+      var d=buscarDef(tx||el.textContent);el.setAttribute('data-q','1');
+      if(!d)return;
+      var b=document.createElement('button');b.type='button';b.className='bp-q';b.textContent='?';b.setAttribute('data-i',DEF.indexOf(d));b.title='Qué significa';
+      el.appendChild(b);
+    });
+  }catch(e){try{console.warn('bp97 decorar',e)}catch(_){}}
+  enProceso=false;
+}
+var tmr=null;
+new MutationObserver(function(ms){
+  for(var i=0;i<ms.length;i++){var t=ms[i].target;if(t&&t.closest&&t.closest('#bp-pop,#bp-guia'))return}
+  clearTimeout(tmr);tmr=setTimeout(function(){decorar()},250);
+}).observe(document.body,{childList:true,subtree:true});
+setTimeout(decorar,800);
+
+/* ───────── Narrativa del equipo ───────── */
+function mt(rows,k,alto,name){try{return _ligaBuscarEnMapa(_ligaComparativaMetrica(rows,k,alto),name)}catch(e){return null}}
+var FRASES={
+ eFG:['la efectividad de tiro (eFG%)','Buen tiro','Tiro irregular'],TOV:['el cuidado de la pelota (pocas pérdidas)','Cuida la pelota','Pierde muchas pelotas'],
+ ORB:['el rebote ofensivo','Rebote ofensivo','Poco rebote ofensivo'],FTr:['las idas a la línea de libres','Va seguido a la línea','Pocos tiros libres'],
+ eFGr:['la defensa del tiro rival','Defiende el tiro','Deja tirar cómodo al rival'],TOVr:['las pérdidas que fuerza','Fuerza pérdidas','Fuerza pocas pérdidas'],
+ ORBr:['cerrar el rebote defensivo','Cierra el rebote','Regala rebotes ofensivos'],FTRr:['no regalar libres','No regala libres','Regala libres al rival']
+};
+var METS=[['OER',1],['DER',0],['eFG',1],['TOV',0],['ORB',1],['FTr',1],['eFGr',0],['TOVr',1],['ORBr',0],['FTRr',0]];
+function narrativa(games,rows,name){
+  var n=games.length;if(!n)return '';
+  var v=games.filter(function(g){return g.result==='V'}).length,d=n-v;
+  var pf=games.reduce(function(s,g){return s+g.vmScore},0)/n,pc=games.reduce(function(s,g){return s+g.rvScore},0)/n,dif=pf-pc;
+  var wp=v/n;
+  var tags=[],ps=[];
+  var ligaOk=rows&&rows.length>=4&&rows.some(function(t){try{return teamNameMatch(t.name,name)}catch(e){return false}});
+  // P1: perfil
+  var p1='<b>'+esc(name)+'</b> lleva <b>'+v+'V-'+d+'D</b> en fase regular con una diferencia media de <b style="color:'+(dif>=0?G:R)+'">'+sg(dif)+'</b> puntos por partido';
+  if(ligaOk){
+    var o=mt(rows,'OER',true,name),df=mt(rows,'DER',false,name),pa=mt(rows,'pace',true,name),tot=o?o.total:0;
+    if(o&&df){
+      var perfil;
+      if(o.pct>=67&&df.pct>=67)perfil='Es un equipo <b>completo</b>: está entre los mejores de la liga en ataque ('+o.puesto+'º) y en defensa ('+df.puesto+'º).';
+      else if(o.pct>=67&&df.pct<=33)perfil='Es un equipo <b>de ataque</b> ('+o.puesto+'º en ORtg) al que le cuesta defender ('+df.puesto+'º de '+tot+').';
+      else if(df.pct>=67&&o.pct<=33)perfil='Es un equipo <b>de defensa</b> ('+df.puesto+'º en DRtg) al que le cuesta anotar ('+o.puesto+'º de '+tot+').';
+      else if(df.pct>=67)perfil='Su punto fuerte es la <b>defensa</b> ('+df.puesto+'º de '+tot+'); el ataque es de nivel medio ('+o.puesto+'º).';
+      else if(o.pct>=67)perfil='Su punto fuerte es el <b>ataque</b> ('+o.puesto+'º de '+tot+'); la defensa es de nivel medio ('+df.puesto+'º).';
+      else if(o.pct<=33&&df.pct<=33)perfil='Hoy está en el fondo de la liga en ataque ('+o.puesto+'º) y en defensa ('+df.puesto+'º): es un equipo <b>en construcción</b>.';
+      else perfil='Es un equipo de <b>nivel medio</b> de liga: ataque '+o.puesto+'º y defensa '+df.puesto+'º de '+tot+'.';
+      p1+='. '+perfil;
+    } else p1+='.';
+    if(pa){if(pa.pct>=75)p1+=' Juega <b>rápido</b> ('+pa.puesto+'º en ritmo), con muchas posesiones.';else if(pa.pct<=25)p1+=' Juega <b>controlado</b> ('+pa.puesto+'º en ritmo), con pocas posesiones.'}
+  } else p1+='.';
+  if(n>=5){
+    if(dif>=3&&wp<.5)p1+=' Los números dicen que <b>merecería más victorias</b> de las que tiene (suelen ser partidos parejos que se le escapan).';
+    else if(dif<=-3&&wp>.5)p1+=' Gana <b>más de lo que sugieren los números</b>: conviene no confiarse, hay partidos ajustados que podían irse para el otro lado.';
+    else if(Math.abs(dif)>=3)p1+=' El récord es coherente con la diferencia de puntos.';
+  }
+  ps.push(p1);
+  // P2: fortalezas y debilidades
+  if(ligaOk){
+    var lista=[];METS.forEach(function(m){var L=mt(rows,m[0],!!m[1],name);if(L)lista.push({k:m[0],L:L})});
+    var fu=lista.filter(function(x){return x.L.pct>=75&&x.k!=='OER'&&x.k!=='DER'}).sort(function(a,b){return b.L.pct-a.L.pct}).slice(0,3);
+    var de=lista.filter(function(x){return x.L.pct<=25&&x.k!=='OER'&&x.k!=='DER'}).sort(function(a,b){return a.L.pct-b.L.pct}).slice(0,3);
+    var txt='';
+    if(fu.length){txt+='<b>Lo mejor:</b> '+fu.map(function(x){tags.push(['ok','✔ '+FRASES[x.k][1]]);return FRASES[x.k][0]+' ('+x.L.puesto+'º de '+x.L.total+')'}).join(', ')+'. '}
+    if(de.length){txt+='<b>Lo que más le cuesta:</b> '+de.map(function(x){tags.push(['no','✘ '+FRASES[x.k][2]]);return FRASES[x.k][0]+' ('+x.L.puesto+'º de '+x.L.total+')'}).join(', ')+'.'}
+    if(!txt)txt='En los factores de juego (tiro, pérdidas, rebote y libres) está en la mitad de la tabla, sin una virtud ni un problema marcados.';
+    var tirE=lista.filter(function(x){return x.k==='eFG'})[0],rebO=lista.filter(function(x){return x.k==='ORB'})[0];
+    if(tirE&&rebO&&tirE.L.pct<=40&&rebO.L.pct>=75)txt+=' Compensa el tiro irregular con segundas chances bajo el aro.';
+    ps.push(txt);
+  }
+  // P3: forma y localía
+  var u4=games.slice(-4),w4=u4.filter(function(g){return g.result==='V'}).length,res=games.map(function(g){return g.result}),ult=res[res.length-1],rc=0;
+  for(var i=res.length-1;i>=0&&res[i]===ult;i--)rc++;
+  var p3='';
+  if(rc>=2)p3+='Lleva <b style="color:'+(ult==='V'?G:R)+'">'+rc+(ult==='V'?' victorias':' derrotas')+' seguidas</b>. ';
+  if(u4.length>=3&&n>u4.length)p3+='En los últimos '+u4.length+' ganó '+w4+(w4>=3?' (buena forma)':(w4<=1?' (momento para revisar)':''))+'. ';
+  var L_=games.filter(function(g){return g.location==='L'}),V_=games.filter(function(g){return g.location==='V'});
+  if(L_.length>=3&&V_.length>=3){
+    var wl=L_.filter(function(g){return g.result==='V'}).length,wv=V_.filter(function(g){return g.result==='V'}).length;
+    var dl=L_.reduce(function(s,g){return s+g.vmScore-g.rvScore},0)/L_.length,dv=V_.reduce(function(s,g){return s+g.vmScore-g.rvScore},0)/V_.length;
+    p3+='De local '+wl+'-'+(L_.length-wl)+' ('+sg(dl)+') y de visitante '+wv+'-'+(V_.length-wv)+' ('+sg(dv)+')';
+    var gap=wl/L_.length-wv/V_.length;
+    if(gap>=.3){p3+=': rinde <b>bastante mejor en casa</b>';tags.push(['no','✘ Mejor de local que de visitante'])}
+    else if(gap<=-.3){p3+=': rinde <b>mejor de visitante</b>';tags.push(['ok','✔ Fuerte de visitante'])}
+    p3+='.';
+  }
+  if(p3)ps.push(p3.trim());
+  var html='<div class="bp-narr">'+ps.map(function(p){return '<p>'+p+'</p>'}).join('')+(tags.length?'<div class="tg">'+tags.map(function(t){return '<span class="'+t[0]+'">'+esc(t[1])+'</span>'}).join('')+'</div>':'')+'</div>';
+  return html;
+}
+window.bpNarrativaEquipo=narrativa;
+function aplicarNarrativa(){
+  try{
+    if(typeof esVistaGlobal==='function'&&esVistaGlobal())return;
+    var l=document.getElementById('home-lectura');if(!l||!l.children[0])return;
+    var cuerpo=l.children[0].lastElementChild;if(!cuerpo||cuerpo===l.children[0].firstElementChild)return;
+    var all=sortedGames(),g=(typeof juegosParaStats==='function')?juegosParaStats():all;if(!g.length)g=all;if(!g.length)return;
+    var rows=[];try{rows=getTorneoTeams()||[]}catch(e){}
+    var h=narrativa(g,rows,activeTeamName());if(!h)return;
+    cuerpo.innerHTML=(typeof bpFemHtml==='function'?bpFemHtml(h):h);
+  }catch(e){try{console.warn('bp97 narrativa',e)}catch(_){}}
+}
+function envolver(){
+  var o=window.rHome;if(typeof o!=='function'||o.__bp97)return false;
+  var w=function(){var r=o.apply(this,arguments);aplicarNarrativa();setTimeout(decorar,50);return r};
+  w.__bp97=1;w.__bpIni=o.__bpIni;w.__bpDom=o.__bpDom;window.rHome=w;return true;
+}
+envolver();
 })();
 </script>
 </body>
