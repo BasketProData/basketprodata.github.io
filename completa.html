@@ -2336,7 +2336,7 @@ function openQByFname(fname)     { const i=getIdxByFname(fname); if(i>=0) openQ(
 // Abre el editor de datos del partido desde el fixture, que sólo conoce el
 // nombre. Resuelve si el partido es del torneo o de "mi equipo".
 function editarDatosDeFixture(fname) {
-  const enLiga = (typeof leagueGames!=='undefined') ? leagueGames.find(g => g.fname === fname) : null;
+  const enLiga = _lgPorFname(fname);
   if (enLiga) { abrirEditarPartido(fname, enLiga.fase, 'league'); return; }
   const enExtra = (typeof extraGames!=='undefined') ? extraGames.find(g => g.fname === fname) : null;
   if (enExtra) { abrirEditarPartido(fname, enExtra.fase, 'extra'); return; }
@@ -2348,7 +2348,7 @@ function openVideoByFname(fname) { const i=getIdxByFname(fname); if(i>=0) openVi
 
 // Open box score directly from a leagueGame by fname (for games not in ag())
 function openLgBS(fname) {
-  const lg = leagueGames.find(g=>g.fname===fname);
+  const lg = _lgPorFname(fname);
   if(!lg) return;
   // Build a synthetic game object
   const g = {
@@ -3090,7 +3090,7 @@ function _filaOtrosQuintetos(todos, mostrados) {
     + `<tr style="font-weight:800;border-top:2px solid #6a4c93"><td style="text-align:left">Total en cancha</td><td>${minTot.toFixed(1)}</td><td colspan="4"></td></tr>`;
 }
 function exportInformePartido(fname) {
-  const g = leagueGames.find(x => x.fname === fname);
+  const g = _lgPorFname(fname);
   if (!g) { if (typeof toast==='function') toast('No encontré ese partido.'); return; }
 
   const G='#1b7a3d', R='#c0392b', P='#6a4c93';
@@ -4126,7 +4126,7 @@ const CO_NO_SCALE = { responsive: true, maintainAspectRatio: false };
 // papel. El rebote ofensivo del rival SIEMPRE sale de su propia fila del box
 // score (sr('REB_O')) — nunca se calcula a partir de los nuestros.
 function _verificarRebotesPartido(fname) {
-  const g = leagueGames.find(x => x.fname === fname);
+  const g = _lgPorFname(fname);
   if (!g) { console.warn('No encontré un partido con ese nombre. Fnames disponibles:', leagueGames.map(x=>x.fname)); return; }
   const jugVM = g.playersA || [], jugRV = g.playersB || [];
   const sum = (arr,k) => arr.reduce((s,p)=>s+(p[k]||0),0);
@@ -7619,7 +7619,7 @@ function _pbpAutoCuartos(fname, analisis, ladoPropioPBP, propioEsBoxLocal) {
     // Se escribe en la entrada REAL de leagueGames, no en una copia reorientada
     // (que es lo que suele traer `game` en estos puntos): si no, el dato se
     // pierde apenas termina la función, nunca llega a guardarse.
-    const g = (typeof leagueGames !== 'undefined') ? leagueGames.find(x => x.fname === fname) : null;
+    const g = _lgPorFname(fname);
     if (!g || g.quarters) return;   // sin partido, o ya hay algo cargado: no se pisa
     const ladoRivalPBP = ladoPropioPBP === 'visitante' ? 'local' : 'visitante';
     const campoPropio = ladoPropioPBP === 'visitante' ? 'visita' : 'local';
@@ -8265,7 +8265,7 @@ function _htmlMapaZonasPartido(zn, nombreLocal, nombreVisita) {
     + '<div style="margin-top:6px;font-size:9px;color:#888">Cada zona muestra aciertos/intentos y % de efectividad. El color compara con el promedio de la liga.</div>';
 }
 function verMapaDeTiros(fname) {
-  const g = leagueGames.find(x => x.fname === fname) || (typeof ag==='function' ? ag().find(x=>x.fname===fname) : null);
+  const g = _lgPorFname(fname) || (typeof ag==='function' ? ag().find(x=>x.fname===fname) : null);
   const gid = (typeof _gameId==='function') ? _gameId(fname) : null;
   let eventos = (gid && typeof pbpEventosCrudos==='function') ? pbpEventosCrudos(gid) : null;
   if (!eventos && shotMapStore[fname]) eventos = shotMapStore[fname];
@@ -11305,7 +11305,7 @@ function rFt() {
       </div>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end">
         ${(function(){
-            const orig = leagueGames.find(x => x.fname === fname) || g;
+            const orig = _lgPorFname(fname) || g;
             const esPO = orig.isPlayoff || orig.fase === 2;
             if (esPO || (orig.fecha != null && orig.fecha !== '')) return '';
             return `<span onclick="editarDatosDeFixture('${safeFname}')" title="Este partido no tiene número de fecha: no se puede ordenar ni entra en el gráfico de evolución. Tocá para completarlo." style="cursor:pointer;background:rgba(200,134,10,.16);color:#c8860a;border:1px solid #c8860a;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px">⚠️ Sin fecha</span>`;
@@ -27981,7 +27981,7 @@ function _cpConfirmar() {
 function _pbpGuardarEventos(fname, eventos) {
   if (!fname || !Array.isArray(eventos) || !eventos.length) return false;
   const gameId = _gameId(fname);
-  const game = _pbpGameById(gameId) || (typeof leagueGames!=='undefined' ? leagueGames.find(x => x.fname === fname) : null);
+  const game = _pbpGameById(gameId) || _lgPorFname(fname);
   const local  = game ? (game.location==='L' ? activeTeamName() : (game.rival||game.teamA||'Local')) : 'Local';
   const visita = game ? (game.location==='L' ? (game.rival||game.teamB||'Visitante') : activeTeamName()) : 'Visitante';
   const analisis = pbpAnalizar(eventos, { durCuarto:10, local, visita });
@@ -28033,7 +28033,7 @@ function _cpComplementarBox() {
 function _cpActualizarPbpExistente() {
   if (!_cp || !_cp.pbp || !_cp.pbp.eventos || !_cp._dupFname) return;
   const fnameExistente = _cp._dupFname;
-  const gEx = (typeof leagueGames !== 'undefined') ? leagueGames.find(x => x.fname === fnameExistente) : null;
+  const gEx = _lgPorFname(fnameExistente);
   let boxRearmado = false;
   // Si el box de ese partido salió de otro play-by-play (no es el oficial del GES),
   // se rearma con este; si es el oficial, se conserva tal cual.
@@ -28180,6 +28180,15 @@ function _cpConfirmarInterno() {
   if (faseInfo.kw) prefijo = faseInfo.kw + (_cp.juego ? ' Juego '+_cp.juego : '') + ' - ';
   else { var _fn = _cpFechaNum(); if (_fn != null) prefijo = 'Fecha ' + _fn + ' - '; }
   var fname = prefijo + _cp.local + ' vs ' + _cp.visita;
+  // v99 · si ya existe un partido con ese nombre en OTRO torneo, el nuevo lleva
+  // el torneo en el nombre: play-by-play, acciones y mapa de tiro se guardan por
+  // nombre y se pisarían entre sí.
+  try {
+    var _lgDest = _cp.destData ? _cp.destData.leagueGames : leagueGames;
+    if ((_lgDest || []).some(function (g) { return g.fname === fname && g.torneoId !== _cp.torneoId; })) {
+      fname += ' (' + ((_cpCfg().torneo) || _cp.torneoId || 'otro torneo') + ')';
+    }
+  } catch (e) {}
 
   // La fecha se guarda como campo propio del partido. Antes solo se usaba para
   // armar el nombre y se perdía, así que toda la app tenía que deducirla
@@ -31322,6 +31331,15 @@ function juegosParaStats() {
 
 // Todos los partidos del torneo activo, sin importar la fase (regular + playoffs).
 // Para estadísticas: un partido de playoff es "un partido más" que nutre las stats.
+// v99 · Busca un partido de la liga por nombre dando prioridad al torneo/año
+// activos. Un mismo nombre ("Cuartos de final Juego 2 - A vs B") puede existir
+// en dos torneos; sin esta prioridad se tomaba siempre el primero cargado.
+function _lgPorFname(fname) {
+  if (typeof leagueGames === 'undefined' || !fname) return null;
+  var act = null;
+  try { act = getTorneoGamesAll().find(function(x){ return x.fname === fname; }); } catch (e) {}
+  return act || leagueGames.find(function(x){ return x.fname === fname; }) || null;
+}
 function getTorneoGamesAll() {
   var tActivo = cfgData.torneoActivo;
   var añoActivo = cfgData.temporadaActiva;
@@ -31870,7 +31888,7 @@ async function reconstruirDesdePbp() {
       // g.quarters vive en la copia reorientada de ag(): para chequear antes/
       // después hay que mirar la entrada REAL de leagueGames, que es la que
       // _pbpAutoCuartos efectivamente modifica.
-      const lgReal = leagueGames.find(x => x.fname === g.fname);
+      const lgReal = _lgPorFname(g.fname);
       const teniaCuartos = !!(lgReal && lgReal.quarters);
       const teniaMapaAntes = !!shotMapStore['_zonas_' + g.fname];
       const teniaAcciones = !!accData[g.fname];
